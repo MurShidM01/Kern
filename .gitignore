@@ -1,0 +1,152 @@
+# ---------------------------------------------------------------------------
+# Gradle
+# ---------------------------------------------------------------------------
+# Build output for every module (root, app, core/*, feature/*).
+**/build/
+build/
+out/
+gen/
+bin/
+.gradle/
+.kotlin/
+
+# Configuration cache and caches
+.cxx/
+.externalNativeBuild/
+.cxx/
+
+# ---------------------------------------------------------------------------
+# Local configuration and secrets
+# ---------------------------------------------------------------------------
+# Android SDK location — machine specific, never commit.
+local.properties
+local.defaults.properties
+
+# Signing material
+*.jks
+*.keystore
+*.p12
+*.pem
+*.der
+*.p7b
+*.p7c
+keystore.properties
+signing.properties
+release.properties
+
+# API keys / provider credentials
+google-services.json
+secrets.properties
+.env
+.env.*
+
+# ---------------------------------------------------------------------------
+# IDE
+# ---------------------------------------------------------------------------
+.idea/
+*.iml
+*.ipr
+*.iws
+.navigation/
+captures/
+.vscode/
+.idea_modules/
+.idea/libraries/
+.idea/tasks/
+.idea/usage.statistics.xml
+.idea/dictionaries/
+.idea/shelf/
+*.launch
+.settings/
+.classpath
+.project
+
+# ---------------------------------------------------------------------------
+# Build artifacts
+# ---------------------------------------------------------------------------
+*.apk
+*.ap_
+*.aab
+*.dex
+*.class
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+*.war
+*.ear
+*.hprof
+proguard/
+mapping.txt
+seeds.txt
+
+# Native build intermediates (the vendored binaries under
+# core/terminal/binaries/src/main/jniLibs are intentionally NOT ignored —
+# they are the proot runtime and must be committed for the build to work).
+*.so
+!core/terminal/binaries/src/main/jniLibs/**/lib*.so
+*.a
+*.o
+*.obj
+*.lib
+*.dll
+*.exe
+*.dylib
+
+# ---------------------------------------------------------------------------
+# Logs and crash reports
+# ---------------------------------------------------------------------------
+*.log
+hs_err_pid*.log
+replay_pid*.log
+crash.log
+*.hprof
+log/
+logs/
+
+# ---------------------------------------------------------------------------
+# Verification / device evidence (regenerate locally, do not commit)
+# ---------------------------------------------------------------------------
+verification/**/*.png
+verification/**/*.jpg
+verification/**/*.jpeg
+verification/**/*.gif
+verification/**/*.xml
+verification/**/*.db
+verification/**/*.py
+verification/**/*.log
+
+# ---------------------------------------------------------------------------
+# OS / editor cruft
+# ---------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+.AppleDouble
+.LSOverride
+$RECYCLE.BIN/
+*.swp
+*.swo
+*~
+*.tmp
+*.bak
+*.orig
+*.rej
+
+# Python bytecode (the termux binary fetcher lives in the repo)
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+
+# ---------------------------------------------------------------------------
+# Room exported schemas — MUST be committed (source of truth for migrations)
+# ---------------------------------------------------------------------------
+!core/data/schemas/**
+
+# ---------------------------------------------------------------------------
+# Vendored proot runtime — MUST be committed (build verifies SHA-256 at build time)
+# ---------------------------------------------------------------------------
+!core/terminal/binaries/src/main/jniLibs/**
+!core/terminal/binaries/src/main/assets/terminal/licenses/**
+!core/terminal/binaries/binaries.lock.json
+!core/terminal/binaries/tools/**
