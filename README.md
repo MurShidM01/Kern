@@ -4,7 +4,7 @@
 
 **An AI coding agent that runs entirely on your Android phone.**
 
-*A real terminal with rootless Ubuntu. A real file editor. A live dev-server preview. 29 agent tools. No account, no cloud, no root.*
+*A real terminal with rootless Ubuntu. A real file editor. A live dev-server preview. Twenty-nine agent tools. No account, no cloud, no root.*
 
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-7F52FF.svg?style=flat-square&logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-2024.09.03-4285F4.svg?style=flat-square&logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
@@ -15,12 +15,10 @@
 [![targetSdk](https://img.shields.io/badge/targetSdk-36-3DDC84.svg?style=flat-square)](https://developer.android.com/about/versions/16)
 [![License](https://img.shields.io/badge/License-MIT%20%2B%20GPL--2.0%20%2B%20LGPL--3.0-blue.svg?style=flat-square)](LICENSE)
 
-[![GitHub stars](https://img.shields.io/github/stars/MurShidM01/Kern?style=flat-square&label=%E2%98%85%20Stars&color=gold)](https://github.com/MurShidM01/Kern/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/MurShidM01/Kern?style=flat-square&label=%F0%9F%94%A9%20Forks&color=blue)](https://github.com/MurShidM01/Kern/network/members)
-[![GitHub issues](https://img.shields.io/github/issues/MurShidM01/Kern?style=flat-square&label=%F0%9F%93%8B%20Issues&color=critical)](https://github.com/MurShidM01/Kern/issues)
-[![GitHub license](https://img.shields.io/github/license/MurShidM01/Kern?style=flat-square&label=License&color=blue)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/MurShidM01/Kern?style=flat-square&label=Stars&color=gold)](https://github.com/MurShidM01/Kern/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/MurShidM01/Kern?style=flat-square&label=Forks&color=blue)](https://github.com/MurShidM01/Kern/network/members)
+[![GitHub issues](https://img.shields.io/github/issues/MurShidM01/Kern?style=flat-square&label=Issues&color=critical)](https://github.com/MurShidM01/Kern/issues)
 [![Last commit](https://img.shields.io/github/last-commit/MurShidM01/Kern?style=flat-square&label=Last%20Commit&color=success)](https://github.com/MurShidM01/Kern/commits/main)
-[![Made with Kotlin](https://img.shields.io/badge/Made%20with-Kotlin-7F52FF.svg?style=flat-square&logo=kotlin&logoColor=white)](https://kotlinlang.org)
 
 **Android · Kotlin · Jetpack Compose · OpenAI-compatible API · Offline-first · Rootless Linux**
 
@@ -28,25 +26,16 @@
 
 ---
 
-## 📸 Showcase
+## Demo
 
 <div align="center">
-
-### Watch it work — the agent plans, asks permission, then executes
-
-<p align="center">
-  <img src="docs/assets/kern-demo.gif" alt="Kern demo: an AI agent inspecting a workspace, requesting command approval, running shell commands and driving a terminal on Android" width="320">
-</p>
-
-<sub>
-GIF · 380px · 12 fps · 93-second loop — the agent exploring a workspace, a command approval sheet, a plan review, and a live <code>root@localhost:/workspace#</code> terminal.
-</sub>
-
+<p><img src="docs/assets/kern-demo.gif" alt="Kern demo: an AI agent inspecting a workspace, requesting command approval, running shell commands and driving a terminal on Android" width="340"></p>
+<sub>380px, 12 fps, 93-second loop. The agent explores a workspace, a command approval sheet, a plan review, and a live <code>root@localhost:/workspace#</code> terminal.</sub>
 </div>
 
 ---
 
-## 🖼️ Screenshots
+## Screenshots
 
 <div align="center">
 <table>
@@ -94,7 +83,7 @@ GIF · 380px · 12 fps · 93-second loop — the agent exploring a workspace, a 
 </div>
 
 <details>
-<summary><b>📱 Full gallery — setup, providers and approvals (10 more)</b></summary>
+<summary><b>Full gallery: setup, providers and approvals</b></summary>
 
 <div align="center">
 <table>
@@ -105,10 +94,10 @@ GIF · 380px · 12 fps · 93-second loop — the agent exploring a workspace, a 
 <td width="160"><img src="docs/assets/screenshots/04-setup-ai-provider.jpg" alt="Setup wizard step 3: connect an AI provider" width="160"></td>
 </tr>
 <tr>
-<td align="center"><sub>1 · Workspace</sub></td>
-<td align="center"><sub>2 · Download</sub></td>
-<td align="center"><sub>2 · Extract</sub></td>
-<td align="center"><sub>3 · Provider</sub></td>
+<td align="center"><sub>1 &middot; Workspace</sub></td>
+<td align="center"><sub>2 &middot; Download</sub></td>
+<td align="center"><sub>2 &middot; Extract</sub></td>
+<td align="center"><sub>3 &middot; Provider</sub></td>
 </tr>
 <tr>
 <td width="160"><img src="docs/assets/screenshots/05-provider-editor.jpg" alt="Provider editor form for an OpenAI-compatible endpoint" width="160"></td>
@@ -141,144 +130,145 @@ GIF · 380px · 12 fps · 93-second loop — the agent exploring a workspace, a 
 
 ---
 
-## 🚀 What is Kern?
+## What is Kern
 
-**Kern** is a **local-first AI coding agent for Android**. It gives a large language model a *real workspace* on your phone — your actual files, a *real shell*, and a *real browser preview* — and then gets out of the way while it works.
+**Kern** is a local-first AI coding agent for Android. It gives a large language model a real workspace on your phone: your actual files, a real shell, and a real browser preview. It then gets out of the way while the model works.
 
-There is no cloud workspace to connect to, no SSH tunnel to configure, no root to grant, and no desktop required. The model runs the tool calls; your phone runs the code.
+There is no cloud workspace to connect to, no SSH tunnel to configure, no root to grant, and no desktop required. The model decides what to do, and your phone runs it.
 
-> 🐧 **A real Linux, without root.** Kern bundles a SHA-256-verified [proot](https://proot-me.github.io/) runtime and installs a pinned **Ubuntu 24.04.1 LTS** rootfs on demand. You get a genuine `bash`, real `apt`, a real `gcc` — on a phone, unrooted.
+A real Linux without root is the foundation. Kern bundles a SHA-256-verified [proot](https://proot-me.github.io/) runtime and installs a pinned Ubuntu 24.04.1 LTS rootfs on demand, which gives you a genuine `bash`, real `apt`, and a real toolchain on a phone that is not rooted.
 
 ---
 
-## ✨ Feature Highlights
+## Features
 
-### 🤖 An agent that actually does things
+### An agent that does the work
 
-**29 built-in tools** across six areas — the model calls them, and Kern runs them:
+Twenty-nine built-in tools across eight areas. The model calls them and Kern runs them.
 
 | Area | Tools |
-|---|---|
-| 📁 **Files** | `list_files` `read_file` `search_files` `glob` `grep` `fetch_url` |
-| ✏️ **Edit** | `propose_edit` `edit_file` `write_file` `delete_file` `propose_patch` |
-| 🔨 **Build** | `run_build` `run_tests` `run_lint` |
-| 🐚 **Shell** | `run_command` `terminal_status` |
-| 🌿 **Git** | `git_status` `git_diff` `git_commit` |
-| 🧠 **Agent** | `update_todos` `propose_plan` `remember` |
-| 🖥️ **Server** | `server_start` `server_stop` |
-| 👁️ **Preview** | `preview_open` `preview_status` `preview_console` `preview_eval` `preview_screenshot` |
+| --- | --- |
+| Files | `list_files` `read_file` `search_files` `glob` `grep` `fetch_url` |
+| Edit | `propose_edit` `edit_file` `write_file` `delete_file` `propose_patch` |
+| Build | `run_build` `run_tests` `run_lint` |
+| Shell | `run_command` `terminal_status` |
+| Git | `git_status` `git_diff` `git_commit` |
+| Agent | `update_todos` `propose_plan` `remember` |
+| Server | `server_start` `server_stop` |
+| Preview | `preview_open` `preview_status` `preview_console` `preview_eval` `preview_screenshot` |
 
-**The loop is careful by design:**
+The loop is careful by design:
 
-- **Read-only tools run in parallel**; mutating tools run in sequence, behind approval.
-- **Permission modes** — `Ask changes`, `Auto edit`, `Full access` — decide what needs your sign-off.
-- **Nothing destructive runs silently.** `rm -rf`, `mkfs`, `git reset --hard` always ask.
-- **A failing tool never aborts the turn** — it returns an error the model can read and recover from.
-- **Malformed tool arguments are repaired centrally**, so a model that guesses `file_path` instead of `path` still works.
+- Read-only tools run in parallel; mutating tools run in sequence, behind approval.
+- Permission modes (`Ask changes`, `Auto edit`, `Full access`) decide what needs your sign-off.
+- Nothing destructive runs silently. `rm -rf`, `mkfs` and `git reset --hard` always ask.
+- A failing tool returns an error the model can read and recover from, rather than aborting the turn.
+- Malformed tool arguments are repaired centrally, so a model that guesses `file_path` instead of `path` still works.
 
-### 🐧 A real terminal, not a wrapper around `sh`
+### A real terminal, not a wrapper around `sh`
 
-Most Android terminals fake it. Kern does not:
+Most Android terminals fake it. Kern does not.
 
-- A **hand-written POSIX PTY** in C — `posix_openpt` → `fork` → `setsid` → `TIOCSCTTY` → `execve` — so the guest gets a *controlling terminal* and job control, prompts and TUIs all behave.
-- A **pure-Kotlin VT/ANSI emulator** with primary and alternate screen buffers, bounded scrollback, scroll regions, 256-colour and truecolour SGR, and East-Asian wide-character handling.
-- A **bidirectional terminal**: the emulator returns response bytes for `DSR`, `DA` and OSC colour queries, instead of only rendering.
-- The `TerminalEmulator` is a plain `kotlin-jvm` module, so it is unit-testable without a device.
+- A hand-written POSIX PTY in C: `posix_openpt`, `fork`, `setsid`, `TIOCSCTTY`, `execve`. The guest gets a controlling terminal, so job control, prompts and TUIs all behave.
+- A pure-Kotlin VT and ANSI emulator with primary and alternate screen buffers, bounded scrollback, scroll regions, 256-colour and truecolour SGR, and East-Asian wide-character handling.
+- A bidirectional terminal: the emulator returns response bytes for `DSR`, `DA` and OSC colour queries rather than only rendering.
+- The emulator is a plain `kotlin-jvm` module, so it is unit-testable without a device.
 
-### 👁️ See what the agent built
+### A live preview of what it built
 
-Start a dev server from the agent and Kern opens a **live WebView preview** with a browser-style console drawer. The agent can read that console, evaluate JavaScript in the page, and take screenshots — all without you leaving the app.
+Start a dev server from the agent and Kern opens a live WebView preview with a browser-style console drawer. The agent can read that console, evaluate JavaScript in the page, and take screenshots, all without you leaving the app.
 
-The preview is locked to the loopback dev server, and the only JavaScript bridge exposed is a `report(level, message, source, line)` console hook, so that bridge is never reachable from a remote page.
+Navigation inside the preview is locked to the loopback dev server, and the only JavaScript bridge exposed is a `report(level, message, source, line)` console hook, so that bridge is never reachable from a remote page.
 
-### 🔒 Private by construction
+### Private by construction
 
-- API keys are encrypted with **AES-256-GCM** using the **Android Keystore** — never stored in plain text, never written to a log.
-- Works with **any OpenAI-compatible endpoint**, including a local one.
-- **No telemetry, no account, no server.** The app is the product.
+- API keys are encrypted with AES-256-GCM using the Android Keystore. They are never stored in plain text and never written to a log.
+- Works with any OpenAI-compatible endpoint, including one running on your own machine.
+- No telemetry, no account, and no server. The app is the product.
 
 ---
 
-## 🧩 Architecture
+## Architecture
 
-Kern is a **25-module Gradle project** with a strict `core/*` + `feature/*` layering. `core:model` is pure Kotlin with no Android dependency, and `core:terminal:engine` is a plain JVM module — both are unit-testable on the JVM.
+Kern is a 22-module Gradle project with a strict `core` and `feature` layering. `core:model` is pure Kotlin with no Android dependency and `core:terminal:engine` is a plain JVM module, so both are unit-testable on the JVM.
 
-```
-:app                       Navigation shell · setup wizard · foreground services
-:core:model                Domain models and enums (pure Kotlin, no Android)
-:core:common               Dispatchers · logging · secret redaction
-:core:designsystem         Theme tokens · 11 palettes · shared Compose components
-:core:data                 Room v4 · DataStore · Keystore-encrypted credentials
-:core:workspace            Workspace lifecycle · adapters · execution mirror
-:core:providers:api        Provider-neutral LLM contracts
-:core:providers:openai     OpenAI-compatible SSE streaming adapter
-:core:agent                The agent loop · context builder · workspace memory
-:core:tools                29 tools · registry · argument-repair layer
-:core:auth                 API-key auth coordinator
-:core:terminal:api         TerminalRuntime contract
-:core:terminal:engine      Pure-Kotlin VT/ANSI emulator (JVM)
-:core:terminal:pty         Native POSIX PTY bridge (C + CMake + NDK)
-:core:terminal:binaries    Vendored proot runtime, SHA-256 pinned
-:core:terminal:implementation  Layered runtime · sessions · distro installer
-:feature:home              Dashboard
-:feature:files             File explorer and code editor
-:feature:agent             Agent chat, approvals, plan review
-:feature:settings          Appearance, provider profiles, model catalogue
-:feature:terminal          Terminal UI, environment setup, package manager
-:feature:preview           Live WebView preview and console drawer
-```
+| Module | Responsibility |
+| --- | --- |
+| `:app` | Navigation shell, setup wizard, foreground services |
+| `:core:model` | Domain models and enums, pure Kotlin |
+| `:core:common` | Dispatchers, logging, secret redaction |
+| `:core:designsystem` | Theme tokens, 11 palettes, shared Compose components |
+| `:core:data` | Room v4, DataStore, Keystore-encrypted credentials |
+| `:core:workspace` | Workspace lifecycle, adapters, execution mirror |
+| `:core:providers:api` | Provider-neutral LLM contracts |
+| `:core:providers:openai` | OpenAI-compatible SSE streaming adapter |
+| `:core:agent` | The agent loop, context builder, workspace memory |
+| `:core:tools` | 29 tools, registry, argument-repair layer |
+| `:core:auth` | API-key auth coordinator |
+| `:core:terminal:api` | The `TerminalRuntime` contract |
+| `:core:terminal:engine` | Pure-Kotlin VT and ANSI emulator, JVM |
+| `:core:terminal:pty` | Native POSIX PTY bridge, C with CMake and the NDK |
+| `:core:terminal:binaries` | Vendored proot runtime, SHA-256 pinned |
+| `:core:terminal:implementation` | Layered runtime, session manager, distro installer |
+| `:feature:home` | Dashboard |
+| `:feature:files` | File explorer and code editor |
+| `:feature:agent` | Agent chat, approvals, plan review |
+| `:feature:settings` | Appearance, provider profiles, model catalogue |
+| `:feature:terminal` | Terminal UI, environment setup, package manager |
+| `:feature:preview` | Live WebView preview and console drawer |
 
 ### How the pieces fit
 
 ```
-   ┌──────────────┐   AgentEvent    ┌───────────────┐
-   │  :app        │◄───────────────►│  :core:agent  │
-   │  NavHost     │                 │  the loop     │
-   └──────┬───────┘                 └───────┬───────┘
-          │                                 │
-          │  ┌──────────────────────────────┴──────────────┐
-          ▼  ▼                                             ▼
-   ┌─────────────┐   tool calls    ┌──────────────┐   ┌───────────────┐
-   │ :core:tools │◄───────────────►│ :core:workspace│  │ :core:providers│
-   └──────┬──────┘                 └───────────────┘   └───────┬───────┘
-          │                                                    │
-          │ command                                    SSE stream │
-          ▼                                                    ▼
-   ┌──────────────────────┐                          ┌────────────────────┐
-   │ :core:terminal       │                          │ :core:providers:   │
-   │ impl → pty → proot   │                          │ openai             │
-   │ real Ubuntu 24.04    │                          └────────────────────┘
-   └──────────────────────┘
+   +---------------+   AgentEvent   +----------------+
+   |     :app      |<-------------->|   :core:agent  |
+   |   NavHost     |                |   the loop     |
+   +-------+-------+                +-------+--------+
+           |                                |
+           |  +-----------------------------+-------------+
+           |  |                                           |
+           v  v                                           v
+   +----------------+  tool calls  +---------------+  +------------------+
+   |  :core:tools   |<------------->| :core:workspace |  | :core:providers  |
+   +-------+--------+               +---------------+  |      openai      |
+           |                                        +--------+---------+
+           | command                                        | SSE stream
+           v                                                v
+   +----------------------+                      +----------------------+
+   | :core:terminal       |                      | :core:providers:api  |
+   | impl -> pty -> proot |                      +----------------------+
+   | real Ubuntu 24.04    |
+   +----------------------+
 ```
 
 ---
 
-## 🛡️ Safety Model
+## Safety model
 
-Nothing happens silently. Every command is classified before it runs:
+Nothing happens silently. Every command is classified before it runs.
 
 | Impact | Examples | Behaviour |
-|---|---|---|
-| 🟢 **Read-only** | `ls` `grep` `cat` `git status` | Runs freely |
-| 🟡 **Mutating** | `npm install` `git add` `write_file` | Gated by permission mode |
-| 🟠 **Network** | `curl` `npm publish` | Gated by permission mode |
-| 🔴 **Destructive** | `rm -rf` `mkfs` `git reset --hard` | **Always asks** |
+| --- | --- | --- |
+| Read-only | `ls` `grep` `cat` `git status` | Runs freely |
+| Mutating | `npm install` `git add` `write_file` | Gated by permission mode |
+| Network | `curl` `npm publish` | Gated by permission mode |
+| Destructive | `rm -rf` `mkfs` `git reset --hard` | Always asks |
 
-Sensitive values are redacted from tool arguments, URLs, headers and error messages before anything is logged or displayed. The classifier is a *safety signal only* — it never executes anything, and it errs toward a higher impact when unsure.
+Sensitive values are redacted from tool arguments, URLs, headers and error messages before anything is logged or displayed. The classifier is a safety signal only: it never executes anything, and it errs toward a higher impact when it is unsure.
 
 ---
 
-## 🚀 Getting Started
+## Getting started
 
 ### Requirements
 
 | | |
-|---|---|
-| **Android** | 12 (API 31) or newer |
-| **JDK** | 17 or newer |
-| **Android SDK** | API 36 |
-| **Gradle** | 8.14.4 (via the bundled wrapper) |
-| **Arch** | `arm64-v8a` or `x86_64` |
+| --- | --- |
+| Android | 12 (API 31) or newer |
+| JDK | 17 or newer |
+| Android SDK | API 36 |
+| Gradle | 8.14.4, via the bundled wrapper |
+| Architecture | `arm64-v8a` or `x86_64` |
 
 ### Build from source
 
@@ -288,7 +278,7 @@ cd Kern
 ./gradlew assembleDebug
 ```
 
-The APK lands in `app/build/outputs/apk/debug/app-debug.apk`.
+The APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
 
 ```bash
 # install on a connected device
@@ -303,85 +293,82 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ### First launch
 
-1. **Point it at a folder** — an existing folder via the system picker, or an app-managed workspace inside Kern's private storage.
-2. **Install Ubuntu** *(optional)* — a ~65 MB SHA-256-verified download, staged and promoted atomically, so a failed download never breaks a working install. The built-in shell works without it.
-3. **Add a provider** — any OpenAI-compatible base URL and API key. Kern tests the connection before saving.
+1. **Point it at a folder.** Choose an existing folder through the system picker, or an app-managed workspace inside Kern's private storage.
+2. **Install Ubuntu** (optional). A 65 MB SHA-256-verified download, staged and promoted atomically, so a failed download never breaks a working install. The built-in shell works without it.
+3. **Add a provider.** Any OpenAI-compatible base URL and API key. Kern tests the connection before saving.
 4. **Ask it to do something.**
 
-> 💡 **Tip:** grant **All files access** and Files, the Editor, the Agent and the Terminal all share one real `/sdcard` tree. Without it, the terminal runs against a private mirror that you can sync back explicitly.
+Granting All files access is worth the one-time setup. With it, Files, the Editor, the Agent and the Terminal all share a single real `/sdcard` tree. Without it, the terminal runs against a private mirror that you can sync back explicitly.
 
 ---
 
-## 🧪 Testing
+## Testing
 
-**466 unit tests** across 66 suites, all passing.
+466 unit tests across 66 suites, all passing.
 
 | Module | Coverage |
-|---|---|
+| --- | --- |
 | `:core:agent` | Agent loop, parallel tools, approvals, context builder, compaction, workspace memory |
 | `:core:tools` | Every tool, argument repair, diffing, patch application, preview and dev-server seams |
 | `:core:terminal:engine` | VT parser, emulator, SGR, scrollback, text widths |
 | `:core:terminal:implementation` | Installer, extractor, command executor, session manager, dev servers, proot launcher |
-| `:core:data` | Room DAOs, migrations 1→4, mappers, preferences |
+| `:core:data` | Room DAOs, migrations 1 to 4, mappers, preferences |
 | `:core:workspace` | Path containment, external path resolution, workspace adapters, execution mirror |
 | `:core:providers:openai` | SSE streaming and error handling against a mock server |
-| `:feature:*` | ViewModel behaviour for agent, terminal, preview |
+| `:feature:*` | ViewModel behaviour for agent, terminal and preview |
 
-**Stack:** JUnit 4 · Truth · Robolectric · Turbine · MockK · MockWebServer · Room testing · Compose UI test.
-
----
-
-## 🧱 Notable engineering decisions
-
-- **Two "workspace" concepts.** A *logical* workspace (`WorkspaceManager`, `WorkspaceAdapter`) and an *execution* workspace (`ExecutionWorkspaceManager`, `ExecutionMirror`). They diverge when a SAF folder lacks all-files access, and the mirror is pure over a tree seam so it is testable without Android.
-- **`@Upsert`, never `@Insert(REPLACE)`.** `REPLACE` deletes and re-inserts, firing `ON DELETE CASCADE` and silently wiping sessions. A regression test locks this in.
-- **The turn is not owned by `viewModelScope`.** It lives in an application-scoped `AgentSessionStore`, so navigating away does not cancel the provider stream. A foreground service stops Android freezing the process mid-turn.
-- **The terminal pumps with `emit`, not `tryEmit`.** A bounded `SharedFlow` *drops* values when full, which silently truncated the package catalogue. Suspending applies backpressure through the PTY instead.
-- **Schema-driven argument repair.** `ToolArgs.normalize` fixes alias mismatches, wrapper envelopes, stringified types and embedded JSON in one place rather than in 29 tools.
-- **The vendored binaries are SHA-256 pinned** in `binaries.lock.json` and re-verified on every build, so a tampered `.so` fails the build rather than the device.
+The stack is JUnit 4, Truth, Robolectric, Turbine, MockK, MockWebServer, Room testing and Compose UI test.
 
 ---
 
-## 📄 License
+## Engineering notes
 
-Kern's own source code is licensed under the **MIT License** — see [`LICENSE`](LICENSE).
+A few decisions that are not obvious from the code, and that are worth knowing before you change anything.
 
-The bundled third-party runtime keeps its own license, and the full texts ship inside the APK under `assets/terminal/licenses/`:
+**Two different workspace concepts.** A logical workspace (`WorkspaceManager`, `WorkspaceAdapter`) and an execution workspace (`ExecutionWorkspaceManager`, `ExecutionMirror`) are separate. They diverge when a SAF folder lacks All files access, and the mirror is pure over a tree seam so it stays testable without Android.
+
+**`@Upsert`, never `@Insert(REPLACE)`.** `REPLACE` deletes and re-inserts, which fires `ON DELETE CASCADE` and silently wipes sessions. A regression test locks this in.
+
+**The turn is not owned by `viewModelScope`.** It lives in an application-scoped `AgentSessionStore`, so navigating away does not cancel the provider stream. A foreground service stops Android freezing the process mid-turn.
+
+**The terminal pumps with `emit`, not `tryEmit`.** A bounded `SharedFlow` drops values when full, which silently truncated the package catalogue. Suspending applies backpressure through the PTY instead.
+
+**Schema-driven argument repair.** `ToolArgs.normalize` fixes alias mismatches, wrapper envelopes, stringified types and embedded JSON in one place rather than in twenty-nine tools.
+
+**The vendored binaries are SHA-256 pinned** in `binaries.lock.json` and re-verified on every build, so a tampered `.so` fails the build rather than the device.
+
+---
+
+## License
+
+Kern's own source code is licensed under the MIT License. See [`LICENSE`](LICENSE).
+
+The bundled third-party runtime keeps its own license, and the full texts ship inside the APK under `assets/terminal/licenses/`.
 
 | Component | Version | License |
-|---|---|---|
-| [proot](https://proot-me.github.io/) | 5.1.107.96 | **GPL-2.0** |
-| [libtalloc](https://www.samba.org/amba/talloc/) | 2.5.0 | **LGPL-3.0** |
-| [libandroid-shmem](https://github.com/termux/libandroid-shmem) | 0.7 | **MIT** |
+| --- | --- | --- |
+| [proot](https://proot-me.github.io/) | 5.1.107.96 | GPL-2.0 |
+| [libtalloc](https://www.samba.org/amba/talloc/) | 2.5.0 | LGPL-3.0 |
+| [libandroid-shmem](https://github.com/termux/libandroid-shmem) | 0.7 | MIT |
 
-> ⚠️ **Note:** the `proot` binary is distributed under **GPL-2.0**, and `libtalloc` under **LGPL-3.0**. Kern's own source remains MIT, but the repository as a whole is **MIT + GPL-2.0 + LGPL-3.0** because of the redistributed binaries in `core/terminal/binaries/`.
-
----
-
-## 🤝 Contributing
-
-Contributions are very welcome — issues, ideas and pull requests.
-
-```bash
-git clone https://github.com/MurShidM01/Kern.git
-cd Kern
-./gradlew testDebugUnitTest   # 466 tests
-./gradlew assembleDebug
-```
-
-**Please do not commit** build output, device screenshots, or API keys — `.gitignore` already covers them. Two things **must** stay committed:
-
-- `core/data/schemas/` — the exported Room schemas are the source of truth for migrations.
-- `core/terminal/binaries/src/main/jniLibs/` — the vendored proot runtime, verified by hash at build time.
+The `proot` binary is distributed under GPL-2.0 and `libtalloc` under LGPL-3.0. Kern's own source remains MIT, but the repository as a whole is MIT, GPL-2.0 and LGPL-3.0 because of the redistributed binaries in `core/terminal/binaries/`.
 
 ---
 
-## 🔗 Related
+## Contributing
 
-- [proot](https://proot-me.github.io/) — the userspace chroot, seccomp and ptrace emulator that makes rootless Linux work on Android
-- [Termux](https://termux.dev/) — where the vendored binaries and `TERMUX` build conventions come from
-- [Jetpack Compose](https://developer.android.com/jetpack/compose) — the entire UI
-- [Room](https://developer.android.com/training/data-storage/room) · [Hilt](https://dagger.dev/hilt) · [OkHttp](https://square.github.io/okhttp/)
+Contributions are welcome, and the first contribution can be small. Issues, ideas and pull requests are all useful, whether you are fixing a bug, removing dead code, tightening a test, or building a feature.
+
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. It covers how to set up, the commit conventions this project uses, and the few rules that keep the repository working.
+
+---
+
+## Related
+
+- [proot](https://proot-me.github.io/), the userspace chroot, seccomp and ptrace emulator that makes rootless Linux work on Android
+- [Termux](https://termux.dev/), where the vendored binaries and build conventions come from
+- [Jetpack Compose](https://developer.android.com/jetpack/compose), the entire user interface
+- [Room](https://developer.android.com/training/data-storage/room), [Hilt](https://dagger.dev/hilt) and [OkHttp](https://square.github.io/okhttp/)
 
 ---
 
