@@ -7,10 +7,11 @@ plugins {
 
 android {
     namespace = "com.aliedu.kern.core.auth"
-    compileSdk = 36
+    compileSdk = 37
+    compileSdkMinor = 0
 
     defaultConfig {
-        minSdk = 31
+        minSdk = 28
     }
 
     compileOptions {

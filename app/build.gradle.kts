@@ -8,12 +8,13 @@ plugins {
 
 android {
     namespace = "com.aliedu.kern.agent"
-    compileSdk = 36
+    compileSdk = 37
+    compileSdkMinor = 0
 
     defaultConfig {
         applicationId = "com.aliedu.kern.agent"
-        minSdk = 31
-        targetSdk = 36
+        minSdk = 28
+        targetSdk = 37
         versionCode = 1
         versionName = "1.0.0"
         testInstrumentationRunner = "com.aliedu.kern.agent.HiltTestRunner"

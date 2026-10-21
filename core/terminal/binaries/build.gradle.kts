@@ -19,10 +19,11 @@ plugins {
  */
 android {
     namespace = "com.aliedu.kern.core.terminal.binaries"
-    compileSdk = 36
+    compileSdk = 37
+    compileSdkMinor = 0
 
     defaultConfig {
-        minSdk = 31
+        minSdk = 28
         ndk {
             // Real devices are arm64; x86_64 covers emulators.
             abiFilters += listOf("arm64-v8a", "x86_64")
