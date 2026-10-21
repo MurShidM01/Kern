@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 2,
+  "defaultDistroId": "ubuntu",
+  "distros": [
+    {
+      "id": "ubuntu",
+      "name": "Ubuntu",
+      "version": "24.04.1 LTS",
+      "summary": "Ubuntu 24.04 LTS (Noble) with apt.",
+      "shell": "/bin/bash",
+      "rootfsDir": "rootfs",
+      "minFreeBytesAfterInstall": 268435456,
+      "abis": {
+        "x86_64": {
+          "installedSizeBytes": 344723456,
+          "components": [
+            {
+              "id": "rootfs",
+              "url": "https://raw.githubusercontent.com/EXALAB/Anlinux-Resources/master/Rootfs/Ubuntu/amd64/ubuntu-rootfs-amd64.tar.xz",
+              "sha256": "6ada1f4ee6d77b23ec1e3c5aca5fcf0a3170f473b868a13b0256a66f157c95ba",
+              "sizeBytes": 68940224,
+              "archive": "tar.xz",
+              "target": "rootfs"
+            }
+          ],
+          "expectedFiles": [
+            "rootfs/bin/sh",
+            "rootfs/etc/os-release"
+          ]
+        },
+        "arm64-v8a": {
+          "installedSizeBytes": 375939072,
+          "components": [
+            {
+              "id": "rootfs",
+              "url": "https://raw.githubusercontent.com/EXALAB/Anlinux-Resources/master/Rootfs/Ubuntu/arm64/ubuntu-rootfs-arm64.tar.xz",
+              "sha256": "7480ebcf0169caa9de9810e9f6022f8fde4097deeb4f4018c13346f765342a90",
+              "sizeBytes": 65051348,
+              "archive": "tar.xz",
+              "target": "rootfs"
+            }
+          ],
+          "expectedFiles": [
+            "rootfs/bin/sh",
+            "rootfs/etc/os-release"
+          ]
+        }
+      }
+    }
+  ]
+}
