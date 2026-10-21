@@ -74,9 +74,9 @@ If an issue is not labelled but looks small, it probably is. Open it and ask.
 
 | | |
 | --- | --- |
-| Android | 12 (API 31) or newer, on a device or emulator |
+| Android | 9 (API 28) or newer, on a device or emulator |
 | JDK | 17 or newer |
-| Android SDK | API 36 |
+| Android SDK | API 37 |
 | Gradle | 8.14.4, via the bundled wrapper |
 | Architecture | `arm64-v8a` or `x86_64` |
 
@@ -289,7 +289,7 @@ Some parts of this project carry obligations that are easy to break by accident.
 
 **WebView preview (`feature:preview`).** Navigation is locked to the loopback dev server, and the only JavaScript interface exposed is a `report` function for console output. Do not expose anything else, and do not weaken the navigation lock. Remote pages must never be able to reach the bridge.
 
-**`jniLibs.useLegacyPackaging`.** This is set to `true` on purpose. It makes native libraries extract as real files at install time, which is what keeps proot executable on `targetSdk` 36. Do not turn it off.
+**`jniLibs.useLegacyPackaging`.** This is set to `true` on purpose. It makes native libraries extract as real files at install time, which is what keeps proot executable on `targetSdk` 37. Do not turn it off.
 
 ---
 
@@ -304,6 +304,37 @@ A few things must not be committed. The `.gitignore` already covers most of them
 **Do not** reformat the whole repository. A diff nobody can read is a diff nobody reviews.
 
 **Do not** bump dependency versions as part of an unrelated change. A dependency bump is its own pull request, with a note on what changed and why.
+
+---
+
+## Release builds
+
+Kern is distributed as a GitHub release rather than through the Play Store, so the release build is wired up differently from a Play Store app.
+
+```bash
+./gradlew assembleRelease
+```
+
+That produces one APK per ABI plus a universal one, in `app/build/outputs/apk/release/`:
+
+| APK | Terminal | Linux environment |
+| --- | --- | --- |
+| `app-arm64-v8a-release.apk` | Full | Ubuntu 24.04 via proot |
+| `app-x86_64-release.apk` | Full | Ubuntu 24.04 via proot |
+| `app-armeabi-v7a-release.apk` | Full | Built-in device shell only |
+| `app-x86-release.apk` | Full | Built-in device shell only |
+| `app-universal-release.apk` | Full | Ubuntu 24.04 via proot |
+
+The 32-bit builds have no proot because the Termux runtime is only vendored for `arm64-v8a` and `x86_64`. The terminal PTY is built for all four, so the device shell works everywhere.
+
+**The release is signed with the standard Android debug keystore** at `~/.android/debug.keystore`, and that is deliberate. A GitHub release has no key-rotation story, so every future version has to be signed with the same key: a different key turns each update into an uninstall and reinstall, and the user's workspaces with it. The key is valid until 2056.
+
+Two things follow from that, and both matter:
+
+- **Do not lose `~/.android/debug.keystore`.** Losing it means losing the ability to update an already-installed copy of Kern.
+- **Do not commit the keystore.** It is in `.gitignore` for a reason.
+
+**Attach the APKs to a GitHub release, do not commit them.** A 42 MB binary in the repository history can never be removed cleanly, and it would be downloaded by everyone who clones.
 
 ---
 

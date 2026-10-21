@@ -11,8 +11,8 @@
 [![Gradle](https://img.shields.io/badge/Gradle-8.14.4-02303A.svg?style=flat-square&logo=gradle&logoColor=white)](https://gradle.org)
 [![Room](https://img.shields.io/badge/Room-2.6.1-2E8B57.svg?style=flat-square&logo=android&logoColor=white)](https://developer.android.com/training/data-storage/room)
 [![Hilt](https://img.shields.io/badge/Hilt-2.52-3DDC84.svg?style=flat-square&logo=dagger&logoColor=white)](https://dagger.dev/hilt)
-[![minSdk](https://img.shields.io/badge/minSdk-31%20%28Android%2012%29-3DDC84.svg?style=flat-square)](https://developer.android.com/about/versions/12)
-[![targetSdk](https://img.shields.io/badge/targetSdk-36-3DDC84.svg?style=flat-square)](https://developer.android.com/about/versions/16)
+[![minSdk](https://img.shields.io/badge/minSdk-28%20%28Android%209%29-3DDC84.svg?style=flat-square)](https://developer.android.com/about/versions/9)
+[![targetSdk](https://img.shields.io/badge/targetSdk-37-3DDC84.svg?style=flat-square)](https://developer.android.com/about/versions/17)
 [![License](https://img.shields.io/badge/License-MIT%20%2B%20GPL--2.0%20%2B%20LGPL--3.0-blue.svg?style=flat-square)](LICENSE)
 
 [![GitHub stars](https://img.shields.io/github/stars/MurShidM01/Kern?style=flat-square&label=Stars&color=gold)](https://github.com/MurShidM01/Kern/stargazers)
@@ -207,7 +207,7 @@ Yes. Kern is free and open source. Its own code is MIT licensed.
 No. It uses [proot](https://proot-me.github.io/), a userspace chroot and syscall emulator, so a full Linux environment runs on an ordinary, unrooted phone.
 
 **Which Android versions are supported?**
-Android 12 (API 31) and newer, on both `arm64-v8a` and `x86_64` devices.
+Android 9 (API 28) and newer, on `arm64-v8a`, `armeabi-v7a`, `x86` and `x86_64` devices.
 
 **Which AI models work with Kern?**
 Any OpenAI-compatible endpoint. That includes OpenAI and ChatGPT, OpenRouter, Together, Groq, vLLM, Ollama, llama.cpp, LM Studio and custom gateways. The model list is fetched from the provider, and you pick which one the agent uses. If you would rather not send anything to a cloud, run the model on your own machine and point Kern at it for a fully offline workflow.
@@ -245,11 +245,11 @@ Termux gives you a terminal and leaves the rest to you. Kern gives you a termina
 
 | | |
 | --- | --- |
-| Android | 12 (API 31) or newer |
+| Android | 9 (API 28) or newer |
 | JDK | 17 or newer |
-| Android SDK | API 36 |
+| Android SDK | API 37 |
 | Gradle | 8.14.4, via the bundled wrapper |
-| Architecture | `arm64-v8a` or `x86_64` |
+| Architecture | `arm64-v8a`, `armeabi-v7a`, `x86` or `x86_64` |
 
 ---
 
