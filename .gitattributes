@@ -1,0 +1,70 @@
+# Normalize text files in the repository to LF, and check them out using
+# the platform default.
+* text=auto
+
+# ---------------------------------------------------------------------------
+# Shell scripts must keep LF endings. A CRLF gradlew fails on Linux and
+# macOS with "bad interpreter: /bin/sh^M", and this repository ships a
+# wrapper that everyone runs first.
+# ---------------------------------------------------------------------------
+*.sh text eol=lf
+gradlew text eol=lf
+
+# ---------------------------------------------------------------------------
+# Windows-only launchers may use CRLF.
+# ---------------------------------------------------------------------------
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# ---------------------------------------------------------------------------
+# Binary files are never touched by line-ending conversion.
+# ---------------------------------------------------------------------------
+*.so binary
+*.jar binary
+*.aar binary
+*.apk binary
+*.aab binary
+*.ttf binary
+*.otf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.zip binary
+*.xz binary
+*.gz binary
+*.keystore binary
+*.jks binary
+
+# ---------------------------------------------------------------------------
+# Language specific defaults, so diffs are meaningful per file type.
+# ---------------------------------------------------------------------------
+*.kt text
+*.kts text
+*.java text
+*.xml text
+*.json text
+*.toml text
+*.gradle text
+*.properties text
+*.pro text
+*.c text
+*.h text
+*.cpp text
+*.md text
+*.txt text
+*.py text
+
+*.kt diff=java
+*.kts diff=java
+*.java diff=java
+*.c diff=c
+*.h diff=c
+*.cpp diff=c
+
+# ---------------------------------------------------------------------------
+# Room exported schemas are committed and must diff line by line.
+# ---------------------------------------------------------------------------
+core/data/schemas/** text eol=lf
