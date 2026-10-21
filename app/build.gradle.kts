@@ -23,6 +23,47 @@ android {
         }
     }
 
+    /**
+     * One APK per ABI, plus a universal one.
+     *
+     * The proot runtime is only vendored for arm64-v8a and x86_64, so the armeabi-v7a and x86
+     * builds ship the terminal PTY and the built-in device shell but not the Ubuntu environment.
+     */
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
+            isUniversalApk = true
+        }
+    }
+
+    /**
+     * The release signing key.
+     *
+     * Kern is published as a GitHub release rather than through the Play Store, so the same key has
+     * to be reused for every future version: a different key would turn each release into an
+     * uninstall-and-reinstall instead of an in-place update. This points at the standard Android
+     * debug keystore, which is a stable, long-lived key that already exists on every machine.
+     *
+     * v2 and v3 signing are both enabled. v3 is what makes a future key rotation possible, so it
+     * is worth having signed in from the start rather than discovering its absence later.
+     *
+     * Keep `~/.android/debug.keystore` safe. Losing it means losing the ability to update an
+     * already-installed copy of Kern.
+     */
+    signingConfigs {
+        create("release") {
+            storeFile = file("${System.getProperty("user.home")}/.android/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+            enableV1Signing = false
+            enableV2Signing = true
+            enableV3Signing = true
+        }
+    }
+
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
@@ -35,6 +76,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 
