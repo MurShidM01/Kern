@@ -11,7 +11,7 @@
 [![Gradle](https://img.shields.io/badge/Gradle-8.14.4-02303A.svg?style=flat-square&logo=gradle&logoColor=white)](https://gradle.org)
 [![Room](https://img.shields.io/badge/Room-2.6.1-2E8B57.svg?style=flat-square&logo=android&logoColor=white)](https://developer.android.com/training/data-storage/room)
 [![Hilt](https://img.shields.io/badge/Hilt-2.52-3DDC84.svg?style=flat-square&logo=dagger&logoColor=white)](https://dagger.dev/hilt)
-[![minSdk](https://img.shields.io/badge/minSdk-31%20(Android%2012)-3DDC84.svg?style=flat-square)](https://developer.android.com/about/versions/12)
+[![minSdk](https://img.shields.io/badge/minSdk-31%20%28Android%2012%29-3DDC84.svg?style=flat-square)](https://developer.android.com/about/versions/12)
 [![targetSdk](https://img.shields.io/badge/targetSdk-36-3DDC84.svg?style=flat-square)](https://developer.android.com/about/versions/16)
 [![License](https://img.shields.io/badge/License-MIT%20%2B%20GPL--2.0%20%2B%20LGPL--3.0-blue.svg?style=flat-square)](LICENSE)
 
