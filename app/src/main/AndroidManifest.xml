@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Only network use is provider requests and user-triggered downloads (PRD 13.1). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!--
+      Unifies folder workspaces on their real /sdcard path so Files, Editor, Agent tools and the
+      Linux terminal share one tree instead of an execution mirror. Optional: when it is not
+      granted, workspaces keep working through the SAF adapter / mirror fallback.
+    -->
+    <uses-permission
+        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+
+    <!--
+      The terminal keeps its shells alive in the background behind an ongoing notification, like
+      Termux: a foreground service that mirrors the live session count, plus a partial wakelock the
+      user can toggle from the notification so long-running work survives the screen turning off.
+    -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <application
+        android:name=".KernApplication"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Kern"
+        tools:targetApi="34">
+
+        <activity
+            android:name="com.aliedu.kern.agent.MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Kern"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name="com.aliedu.kern.agent.terminal.TerminalSessionService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Interactive terminal sessions kept alive in the background" />
+        </service>
+
+        <!--
+          Keeps an in-flight agent turn running while the user is on another screen or in another
+          app. The turn itself lives in an application-scoped coroutine; this service is what stops
+          Android from freezing the process underneath it.
+        -->
+        <service
+            android:name="com.aliedu.kern.agent.notifications.AgentWorkService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Long-running AI agent turns that must finish in the background" />
+        </service>
+
+    </application>
+
+</manifest>

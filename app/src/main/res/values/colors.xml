@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Kern brand palette (PRD 6.3). Light values; see values-night for dark. -->
+    <color name="kern_primary">#0F7779</color>
+    <color name="kern_background">#F7F9FB</color>
+    <color name="kern_surface">#FFFFFF</color>
+    <color name="kern_on_background">#18232D</color>
+    <color name="kern_error">#A53C42</color>
+    <color name="kern_outline">#6F7C86</color>
+
+    <!-- Window background used before Compose draws (avoids a white flash in dark mode). -->
+    <color name="kern_window_background">#F7F9FB</color>
+
+    <color name="ic_launcher_background">#0F7779</color>
+</resources>

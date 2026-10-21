@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Kern</string>
+    <string name="app_name_short">Kern</string>
+    <string name="content_description_app_icon">Application icon</string>
+
+    <!-- Terminal session notification (mirrors Termux's session notification). -->
+    <string name="terminal_channel_name">Terminal sessions</string>
+    <string name="terminal_channel_description">Keeps your terminal sessions running in the background.</string>
+    <string name="terminal_action_exit">Exit</string>
+    <string name="terminal_action_wakelock">Acquire wakelock</string>
+    <string name="terminal_action_release_wakelock">Release wakelock</string>
+    <plurals name="terminal_session_count">
+        <item quantity="one">%d session</item>
+        <item quantity="other">%d sessions</item>
+    </plurals>
+
+    <!-- Agent turn notification: raised when a turn finishes while the app is in the background. -->
+    <string name="agent_channel_name">Agent tasks</string>
+    <string name="agent_channel_description">Tells you when the agent finishes a task.</string>
+    <string name="agent_turn_done_title">Agent finished in %1$s</string>
+    <string name="agent_turn_done_title_generic">Agent finished</string>
+
+    <!-- Ongoing notification shown while a turn runs, so the work survives backgrounding. -->
+    <string name="agent_work_channel_name">Agent activity</string>
+    <string name="agent_work_channel_description">Shows the agent is working while you are in another app.</string>
+    <string name="agent_work_title">Agent working in %1$s</string>
+    <string name="agent_work_title_generic">Agent working</string>
+    <string name="agent_work_body">Kern keeps working while you are away.</string>
+    <string name="agent_work_stop">Stop</string>
+</resources>

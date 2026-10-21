@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Android robot head stylized as "A" -->
+    <group android:translateX="27" android:translateY="27">
+        <!-- Circle background -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M27,27m-24,0a24,24 0,1 1,48 0a24,24 0,1 1,-48 0"/>
+        <!-- A shape -->
+        <path
+            android:fillColor="#6750A4"
+            android:pathData="M27,42L17,22h4l6,12 6,-12h4L27,42zM24,35l2.5,-5 2.5,5h-5z"/>
+        <!-- Antenna -->
+        <path
+            android:strokeColor="#6750A4"
+            android:strokeWidth="2"
+            android:pathData="M20,18L12,10"/>
+        <path
+            android:strokeColor="#6750A4"
+            android:strokeWidth="2"
+            android:pathData="M34,18L42,10"/>
+    </group>
+</vector>
