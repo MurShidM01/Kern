@@ -3,6 +3,7 @@ package com.aliedu.kern.core.workspace
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Environment
 import android.provider.Settings
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -17,13 +18,20 @@ import javax.inject.Singleton
  *
  * When it is not granted, workspaces still work through the SAF adapter / execution mirror; only the
  * shared real-path behaviour is unavailable.
+ *
+ * All-files access arrived in Android 11 (API 30). On API 28 and 29 the permission does not exist
+ * and the platform call would throw, so this reports "not granted" there and the app uses the SAF
+ * adapter and the execution mirror instead.
  */
 @Singleton
 class StoragePermission @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
 
-    fun isGranted(): Boolean = Environment.isExternalStorageManager()
+    /** True when the platform supports all-files access at all, which is API 30 and up. */
+    val isSupported: Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+
+    fun isGranted(): Boolean = isSupported && Environment.isExternalStorageManager()
 
     /** Opens the per-app "All files access" screen; falls back to the global list on some OEMs. */
     fun requestIntent(): Intent =

@@ -33,6 +33,12 @@ data class HomeUiState(
     val providerConfigured: Boolean = false,
     val activeGrantState: GrantState = GrantState.UNKNOWN,
     val storageAccessGranted: Boolean = false,
+    /**
+     * False on Android 10 and older, where all-files access does not exist. The UI then skips the
+     * grant prompt entirely and goes straight to the folder picker, because there is no screen to
+     * send the user to.
+     */
+    val storageAccessSupported: Boolean = true,
     val busy: Boolean = false,
     val error: String? = null
 )
@@ -86,6 +92,7 @@ class HomeViewModel @Inject constructor(
             providerConfigured = inputs.profiles.isNotEmpty(),
             activeGrantState = active?.grantState ?: GrantState.UNKNOWN,
             storageAccessGranted = hasStorageAccess,
+            storageAccessSupported = storagePermission.isSupported,
             busy = isBusy,
             error = err
         )
@@ -120,9 +127,16 @@ class HomeViewModel @Inject constructor(
     /**
      * The intents that open the all-files-access screen, most specific first. The caller tries each
      * in turn: some OEMs do not ship the per-app screen, so the global list is the fallback.
+     *
+     * Empty on Android 10 and older, where the permission does not exist and neither screen is
+     * present.
      */
     fun storageAccessIntents(): List<Intent> =
-        listOf(storagePermission.requestIntent(), storagePermission.settingsIntent())
+        if (!storagePermission.isSupported) {
+            emptyList()
+        } else {
+            listOf(storagePermission.requestIntent(), storagePermission.settingsIntent())
+        }
 
     fun openSafWorkspace(uri: Uri, displayName: String) {
         viewModelScope.launch {

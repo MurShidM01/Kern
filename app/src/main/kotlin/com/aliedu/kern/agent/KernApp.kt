@@ -208,6 +208,7 @@ fun KernApp(
                         SetupWizard(
                             providerConfigured = homeState.providerConfigured,
                             storageAccessGranted = homeState.storageAccessGranted,
+                            storageAccessSupported = homeState.storageAccessSupported,
                             hasWorkspace = homeState.workspaces.isNotEmpty(),
                             workspaceLabel = (homeState.activeWorkspace
                                 ?: homeState.workspaces.firstOrNull())?.displayName,
@@ -306,6 +307,7 @@ fun KernApp(
                             onNewFolder = filesViewModel::createDirectory,
                             onOpenFolder = { uri, name -> homeViewModel.openSafWorkspace(uri, name) },
                             storageAccessGranted = filesHomeState.storageAccessGranted,
+                            storageAccessSupported = filesHomeState.storageAccessSupported,
                             onRequestStorageAccess = requestStorageAccess,
                             onToggleSidebar = filesViewModel::toggleSidebar,
                             onCloseSidebar = filesViewModel::closeSidebar,

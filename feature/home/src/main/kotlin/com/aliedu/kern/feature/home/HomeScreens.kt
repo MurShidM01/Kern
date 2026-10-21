@@ -88,10 +88,14 @@ private fun rememberFolderPicker(onPicked: (Uri, String) -> Unit): () -> Unit {
  * A folder picker that first offers all-files access. With it, the picked folder is used at its real
  * `/sdcard` path so the Files, Editor, Agent and Terminal all share one tree; without it the folder
  * still works through the SAF-backed mirror. [onRequestStorageAccess] opens the system screen.
+ *
+ * On Android 10 and older all-files access does not exist, so the prompt is skipped and the picker
+ * opens directly: there is no settings screen to send the user to.
  */
 @Composable
 fun rememberStorageAwareFolderPicker(
     storageAccessGranted: Boolean,
+    storageAccessSupported: Boolean = true,
     onRequestStorageAccess: () -> Unit,
     onPicked: (Uri, String) -> Unit
 ): () -> Unit {
@@ -118,7 +122,9 @@ fun rememberStorageAwareFolderPicker(
         )
     }
 
-    return { if (storageAccessGranted) pickFolder() else showPrompt = true }
+    return {
+        if (storageAccessGranted || !storageAccessSupported) pickFolder() else showPrompt = true
+    }
 }
 
 @Composable
@@ -157,6 +163,7 @@ fun HomeScreen(
 ) {
     val pickFolder = rememberStorageAwareFolderPicker(
         storageAccessGranted = state.storageAccessGranted,
+        storageAccessSupported = state.storageAccessSupported,
         onRequestStorageAccess = onRequestStorageAccess,
         onPicked = onOpenFolder
     )

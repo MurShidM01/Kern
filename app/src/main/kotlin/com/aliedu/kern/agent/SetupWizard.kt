@@ -95,6 +95,7 @@ private val wizardSteps = listOf(
 fun SetupWizard(
     providerConfigured: Boolean,
     storageAccessGranted: Boolean,
+    storageAccessSupported: Boolean = true,
     hasWorkspace: Boolean,
     workspaceLabel: String?,
     onRequestStorageAccess: () -> Unit,
@@ -107,6 +108,7 @@ fun SetupWizard(
     var step by rememberSaveable { mutableIntStateOf(0) }
     val pickFolder = rememberStorageAwareFolderPicker(
         storageAccessGranted = storageAccessGranted,
+        storageAccessSupported = storageAccessSupported,
         onRequestStorageAccess = onRequestStorageAccess,
         onPicked = onOpenFolder
     )

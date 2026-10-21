@@ -114,6 +114,7 @@ fun FilesExplorerScreen(
     onNewFolder: (String) -> Unit,
     onOpenFolder: (Uri, String) -> Unit,
     storageAccessGranted: Boolean,
+    storageAccessSupported: Boolean = true,
     onRequestStorageAccess: () -> Unit,
     onToggleSidebar: () -> Unit,
     onCloseSidebar: () -> Unit,
@@ -127,9 +128,15 @@ fun FilesExplorerScreen(
             onOpenFolder(uri, name)
         }
     }
-    // Offer all-files access first so the folder is used at its real path (shared with the terminal).
+    // Offer all-files access first so the folder is used at its real path (shared with the
+    // terminal). On Android 10 and older the permission does not exist, so the picker opens
+    // directly: there is no settings screen to send the user to.
     val pickFolder: () -> Unit = {
-        if (storageAccessGranted) launcher.launch(null) else showStoragePrompt = true
+        if (storageAccessGranted || !storageAccessSupported) {
+            launcher.launch(null)
+        } else {
+            showStoragePrompt = true
+        }
     }
 
     if (showStoragePrompt) {
