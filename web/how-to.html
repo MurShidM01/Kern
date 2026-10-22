@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='112' fill='%23151A2A'/%3E%3Cpath d='M176,146 H176 A30,30 0 0 1 206,176 V336 A30,30 0 0 1 176,366 H176 A30,30 0 0 1 146,336 V176 A30,30 0 0 1 176,146 Z' fill='%23fff'/%3E%3Cpath d='M339.67,143 L185.58,256 L339.67,369 L376.33,319 L290.42,256 L376.33,193 Z' fill='%23fff'/%3E%3Cpath d='M272,226 Q278,250 302,256 Q278,262 272,286 Q266,262 242,256 Q266,250 272,226 Z' fill='%2338BDF8'/%3E%3C/svg%3E">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How to Use Kern - Step by Step Guide</title>
+<meta name="description" content="A complete step-by-step guide to using Kern on Android: install the APK, create a workspace, install the Ubuntu environment, connect an AI provider and run your first agent task.">
+<meta name="keywords" content="Kern how to use, Android AI agent setup, proot Ubuntu install, connect OpenAI compatible API Android, AI coding agent tutorial">
+<meta name="theme-color" content="#f4f3ef">
+<link rel="canonical" href="https://github.com/MurShidM01/Kern/blob/main/web/how-to.html">
+
+<meta property="og:type" content="article">
+<meta property="og:title" content="How to Use Kern - Step by Step Guide">
+<meta property="og:description" content="Install, set up a workspace, add a Linux environment, connect a provider and run your first agent task.">
+
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='112' fill='%23151A2A'/%3E%3Cpath d='M176,146 H176 A30,30 0 0 1 206,176 V336 A30,30 0 0 1 176,366 H176 A30,30 0 0 1 146,336 V176 A30,30 0 0 1 176,146 Z' fill='%23fff'/%3E%3Cpath d='M339.67,143 L185.58,256 L339.67,369 L376.33,319 L290.42,256 L376.33,193 Z' fill='%23fff'/%3E%3Cpath d='M272,226 Q278,250 302,256 Q278,262 272,286 Q266,262 242,256 Q266,250 272,226 Z' fill='%2338BDF8'/%3E%3C/svg%3E">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        bg: "rgb(var(--bg) / <alpha-value>)",
+        "bg-alt": "rgb(var(--bg-alt) / <alpha-value>)",
+        surface: "rgb(var(--surface) / <alpha-value>)",
+        "surface-2": "rgb(var(--surface-2) / <alpha-value>)",
+        ink: "rgb(var(--ink) / <alpha-value>)",
+        muted: "rgb(var(--muted) / <alpha-value>)",
+        line: "rgb(var(--line) / <alpha-value>)",
+        "line-soft": "rgb(var(--line-soft) / <alpha-value>)",
+        accent: "rgb(var(--accent) / <alpha-value>)",
+        "accent-soft": "rgb(var(--accent-soft) / <alpha-value>)",
+        "on-accent": "rgb(var(--on-accent) / <alpha-value>)",
+        "accent-2": "rgb(var(--accent-2) / <alpha-value>)",
+        warn: "rgb(var(--warn) / <alpha-value>)",
+        ok: "rgb(var(--ok) / <alpha-value>)"
+      },
+      fontFamily: {
+        sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+        display: ["Space Grotesk", "ui-sans-serif", "system-ui", "sans-serif"],
+        mono: ["JetBrains Mono", "ui-monospace", "Menlo", "monospace"]
+      }
+    }
+  }
+};
+</script>
+<link rel="stylesheet" href="css/theme.css">
+<script>
+(function () {
+  try {
+    var t = localStorage.getItem("kern-theme");
+    if (!t) t = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    document.documentElement.setAttribute("data-theme", t);
+    document.documentElement.style.colorScheme = t;
+  } catch (e) {}
+})();
+</script>
+</head>
+
+<body class="antialiased">
+<div class="progress" data-progress role="presentation"></div>
+<a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-4 focus:rounded focus:bg-accent focus:px-4 focus:py-2 focus:text-on-accent">Skip to content</a>
+
+<header data-header class="sticky top-0 z-40 border-b-2 border-line bg-bg/85 backdrop-blur-md">
+  <nav class="shell flex h-[68px] items-center justify-between gap-4" aria-label="Main">
+    <a href="index.html" class="flex items-center gap-3">
+      <span class="brand-tile"><img src="https://raw.githubusercontent.com/MurShidM01/Kern/main/app/src/main/res/drawable-xxxhdpi/ic_launcher_foreground.png" alt="" width="34" height="34" loading="lazy" decoding="async"></span>
+      <span class="font-display text-[19px] font-bold tracking-tight">Kern</span>
+    </a>
+
+    <div class="hidden items-center gap-1 lg:flex">
+      <a href="index.html" class="rounded-lg px-3 py-2 text-[14px] font-medium text-muted transition-colors hover:bg-surface-2 hover:text-ink">Home</a>
+      <a href="index.html#features" class="rounded-lg px-3 py-2 text-[14px] font-medium text-muted transition-colors hover:bg-surface-2 hover:text-ink">Features</a>
+      <a href="index.html#screens" class="rounded-lg px-3 py-2 text-[14px] font-medium text-muted transition-colors hover:bg-surface-2 hover:text-ink">Screens</a>
+      <a href="how-to.html" class="rounded-lg px-3 py-2 text-[14px] font-medium text-ink" aria-current="page">How to use</a>
+      <a href="docs.html" class="rounded-lg px-3 py-2 text-[14px] font-medium text-muted transition-colors hover:bg-surface-2 hover:text-ink">Docs</a>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <button data-theme-toggle type="button" aria-label="Switch theme" aria-pressed="false"
+        class="inline-flex h-10 w-10 items-center justify-center rounded-lg border-2 border-line bg-surface transition-all hover:-translate-y-0.5">
+        <i data-icon="sun" data-lucide="sun" class="h-[18px] w-[18px]"></i>
+        <i data-icon="moon" data-lucide="moon" class="h-[18px] w-[18px]"></i>
+      </button>
+      <a href="https://github.com/MurShidM01/Kern/releases/tag/v1.0.0%2B1" target="_blank" rel="noopener" class="hidden sm:inline-flex btn btn--primary btn--sm">
+        <i data-lucide="download"></i>Download
+      </a>
+      <button data-nav-toggle type="button" aria-expanded="false" aria-label="Open the menu"
+        class="inline-flex h-10 w-10 items-center justify-center rounded-lg border-2 border-line bg-surface lg:hidden">
+        <i data-lucide="menu" class="h-[18px] w-[18px]"></i>
+        <i data-lucide="x" class="hidden h-[18px] w-[18px]"></i>
+      </button>
+    </div>
+  </nav>
+
+  <div data-nav-panel class="hidden border-t-2 border-line bg-surface lg:hidden">
+    <div class="shell flex flex-col gap-1 py-4">
+      <a href="index.html" class="rounded-lg px-3 py-2 font-medium text-muted hover:bg-surface-2 hover:text-ink">Home</a>
+      <a href="index.html#features" class="rounded-lg px-3 py-2 font-medium text-muted hover:bg-surface-2 hover:text-ink">Features</a>
+      <a href="index.html#screens" class="rounded-lg px-3 py-2 font-medium text-muted hover:bg-surface-2 hover:text-ink">Screens</a>
+      <a href="how-to.html" class="rounded-lg px-3 py-2 font-medium text-ink">How to use</a>
+      <a href="docs.html" class="rounded-lg px-3 py-2 font-medium text-muted hover:bg-surface-2 hover:text-ink">Documentation</a>
+      <a href="https://github.com/MurShidM01/Kern/releases/tag/v1.0.0%2B1" target="_blank" rel="noopener" class="btn btn--primary btn--sm mt-3">Download v1.0.0</a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="relative overflow-hidden border-b-2 border-line">
+  <div class="dots"></div>
+  <div class="shell relative py-14 lg:py-20">
+    <p class="label">Walkthrough</p>
+    <h1 class="max-w-3xl text-[clamp(30px,5.4vw,54px)]">How to use Kern</h1>
+    <p class="lede mt-5">
+      From a fresh install to a working AI agent with a real Linux environment, in five steps.
+      The whole thing takes about ten minutes, most of which is downloading Ubuntu.
+    </p>
+    <div class="mt-7 flex flex-wrap gap-2">
+      <span class="chip"><i data-lucide="clock"></i>About 10 minutes</span>
+      <span class="chip"><i data-lucide="hard-drive-download"></i>375 MB for Ubuntu</span>
+      <span class="chip"><i data-lucide="user-round"></i>No account needed</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ STEP 1 ============================ -->
+<section class="section">
+  <div class="shell">
+    <div class="grid gap-10 lg:grid-cols-[1fr_320px]">
+      <div>
+        <div class="steps">
+          <div class="step">
+            <div class="step__num"></div>
+            <div class="step__body">
+              <h2>Install the APK</h2>
+              <p>
+                Download the build that matches your device. If you are not sure which one to take,
+                the universal APK works everywhere.
+              </p>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr><th>Device</th><th>Download</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr><td>Most modern phones</td><td><code>app-arm64-v8a-release.apk</code></td></tr>
+                    <tr><td>x86_64 emulators</td><td><code>app-x86_64-release.apk</code></td></tr>
+                    <tr><td>Older 32-bit phones</td><td><code>app-armeabi-v7a-release.apk</code></td></tr>
+                    <tr><td>x86 emulators</td><td><code>app-x86-release.apk</code></td></tr>
+                    <tr><td>Not sure</td><td><code>app-universal-release.apk</code></td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <p class="mt-4">
+                With the phone connected over USB you can install it directly:
+              </p>
+              <pre><code>adb install -r app-arm64-v8a-release.apk</code></pre>
+              <p class="text-[14px]">
+                Installing by hand works too. Copy the APK to the phone, open it with your file
+                manager, and allow installation from that app when Android asks.
+              </p>
+            </div>
+          </div>
+
+          <div class="step">
+            <div class="step__num"></div>
+            <div class="step__body">
+              <h2>Choose a workspace</h2>
+              <p>
+                A workspace is the folder the agent works in. The Files screen, the editor, the
+                agent and the terminal all share it, so anything the agent changes is immediately
+                visible everywhere else.
+              </p>
+              <ul>
+                <li><strong>Open an existing folder</strong> uses the system picker, so you can point it at a project already on your phone.</li>
+                <li><strong>Create an app-managed workspace</strong> makes a fresh folder inside Kern's private storage. Simple, and it is always available.</li>
+              </ul>
+              <div class="callout callout--note">
+                <i data-lucide="folder-symlink"></i>
+                <p>
+                  <strong>Grant All files access when you can.</strong>
+                  It lets the terminal open your folder at its real path, so there is one shared
+                  tree instead of a mirrored copy. It needs Android 11 or newer; on older versions
+                  Kern uses a private mirror and can sync it back on request.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="step">
+            <div class="step__num"></div>
+            <div class="step__body">
+              <h2>Install the Linux environment</h2>
+              <p>
+                Open the Terminal tab and choose <strong>Linux environment</strong>, then
+                <strong>Install Ubuntu</strong>. Kern downloads a pinned Ubuntu 24.04.1 LTS
+                rootfs, verifies its SHA-256, extracts it into a staging folder and only then
+                promotes it into place. A failed download never damages a working install.
+              </p>
+              <p>Once it is ready you get a real login shell:</p>
+              <div class="term">
+                <div class="term__bar">
+                  <span class="term__dot"></span><span class="term__dot"></span><span class="term__dot"></span>
+                  <span class="term__path">kern:/workspace</span>
+                </div>
+                <div class="term__body">
+                  <div class="term__line term__prompt">root@localhost:/workspace#</div>
+                  <div class="term__line term__out">apt update &amp;&amp; apt install -y python3</div>
+                  <div class="term__line term__ok">[ok] Setting up python3 (3.12.3-0ubuntu2)</div>
+                </div>
+              </div>
+              <div class="callout callout--warn">
+                <i data-lucide="info"></i>
+                <p>
+                  <strong>This step is optional.</strong>
+                  Without it you still get the built-in Android shell, the file explorer, the
+                  editor, the agent and the preview. Ubuntu adds a full userspace with
+                  <code>apt</code>, a compiler and Python.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="step">
+            <div class="step__num"></div>
+            <div class="step__body">
+              <h2>Connect an AI provider</h2>
+              <p>
+                Go to <strong>Settings</strong>, then <strong>Add provider</strong>. Kern needs a
+                base URL, a model id and an API key. It supports anything that speaks the
+                OpenAI chat completions API.
+              </p>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr><th>Service</th><th>Base URL</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr><td>OpenAI</td><td><code>https://api.openai.com/v1</code></td></tr>
+                    <tr><td>OpenRouter</td><td><code>https://openrouter.ai/api/v1</code></td></tr>
+                    <tr><td>Together</td><td><code>https://api.together.xyz/v1</code></td></tr>
+                    <tr><td>Groq</td><td><code>https://api.groq.com/openai/v1</code></td></tr>
+                    <tr><td>Ollama, local</td><td><code>http://127.0.0.1:11434/v1</code></td></tr>
+                    <tr><td>llama.cpp, local</td><td><code>http://127.0.0.1:8080/v1</code></td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <p class="mt-4">
+                Press <strong>Test</strong> first. Kern sends a one-token request, so a wrong key
+                or a wrong model id fails immediately instead of at the first real task. When the
+                test passes, save the profile and pick a model.
+              </p>
+              <div class="callout callout--ok">
+                <i data-lucide="shield-check"></i>
+                <p>
+                  <strong>Your key stays on the device.</strong>
+                  It is encrypted with AES-256-GCM using the Android Keystore and is never
+                  written to a log. If you use a local model, nothing you type leaves the device
+                  at all.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="step">
+            <div class="step__num"></div>
+            <div class="step__body">
+              <h2>Run your first task</h2>
+              <p>
+                Open the <strong>Agent</strong> tab and ask for something. Good first prompts:
+              </p>
+              <ul>
+                <li>"Explain this project and how it is structured."</li>
+                <li>"Find every place this reads the API key and list them."</li>
+                <li>"Write a README for this project."</li>
+                <li>"Run the tests and tell me what failed."</li>
+              </ul>
+              <p>
+                The agent will explore, ask to run commands, and may present a plan before it
+                makes changes. Choose a permission mode first if you want fewer interruptions:
+              </p>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr><th>Mode</th><th>Behaviour</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr><td><strong>Ask changes</strong></td><td>Every write waits for you. The safest.</td></tr>
+                    <tr><td><strong>Auto edit</strong></td><td>Edits go through on their own; commands still ask.</td></tr>
+                    <tr><td><strong>Full access</strong></td><td>Everything runs, except destructive commands, which always ask.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="lg:sticky lg:top-[88px] lg:h-fit">
+        <div class="card">
+          <p class="label">Next</p>
+          <h3 class="text-[17px]">Go deeper</h3>
+          <p class="mb-6 text-[14px]">
+            The full documentation covers the tool set, the permission model, the terminal stack
+            and the project layout.
+          </p>
+          <a href="docs.html" class="btn btn--primary btn--sm w-full">
+            <i data-lucide="book-open"></i>
+            Open the docs
+          </a>
+          <a href="index.html#features" class="btn btn--ghost btn--sm mt-3 w-full">
+            <i data-lucide="layers"></i>
+            See the features
+          </a>
+        </div>
+
+        <div class="card mt-4">
+          <p class="label">Shortcuts</p>
+          <ul class="mt-2 flex flex-col gap-2.5 text-[14px] text-muted">
+            <li class="flex items-center gap-2.5"><i data-lucide="terminal" class="h-4 w-4 flex-none text-accent"></i>Open the terminal from the Home app bar.</li>
+            <li class="flex items-center gap-2.5"><i data-lucide="folder-tree" class="h-4 w-4 flex-none text-accent"></i>Long-press a file in Files to open the editor.</li>
+            <li class="flex items-center gap-2.5"><i data-lucide="globe" class="h-4 w-4 flex-none text-accent"></i>The globe in the agent app bar opens the live preview.</li>
+            <li class="flex items-center gap-2.5"><i data-lucide="list-checks" class="h-4 w-4 flex-none text-accent"></i>The checklist icon shows the agent's task list.</li>
+          </ul>
+        </div>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ TIPS ============================ -->
+<section class="section section--alt">
+  <div class="shell">
+    <div class="section-head">
+      <p class="label">Good to know</p>
+      <h2>Getting the most out of it.</h2>
+    </div>
+
+    <div class="grid g-3">
+      <article class="card reveal">
+        <div class="card__icon"><i data-lucide="folder-tree"></i></div>
+        <h3>Keep the workspace small</h3>
+        <p>Point the agent at one project at a time. A focused folder gives better results than a whole drive, and it keeps the context tight.</p>
+      </article>
+      <article class="card reveal" data-reveal-delay="60">
+        <div class="card__icon"><i data-lucide="list-checks"></i></div>
+        <h3>Use the task list</h3>
+        <p>A multi-step job is far more reliable when the agent has a checklist. It keeps track of what is done and what is left, even across long runs.</p>
+      </article>
+      <article class="card reveal" data-reveal-delay="120">
+        <div class="card__icon"><i data-lucide="git-branch"></i></div>
+        <h3>Commit before you start</h3>
+        <p>Let the agent work on a clean branch. The tool set includes real Git commands, so a mistake is one revert away.</p>
+      </article>
+      <article class="card reveal">
+        <div class="card__icon"><i data-lucide="eye"></i></div>
+        <h3>Watch the preview</h3>
+        <p>For web work, ask the agent to start the server. The preview and its console drawer show exactly what the agent is seeing, so you can correct it early.</p>
+      </article>
+      <article class="card reveal" data-reveal-delay="60">
+        <div class="card__icon"><i data-lucide="zap"></i></div>
+        <h3>Pick a fast model for small jobs</h3>
+        <p>Reading a file does not need a large model. Switch models from the chip above the composer when a task is routine.</p>
+      </article>
+      <article class="card reveal" data-reveal-delay="120">
+        <div class="card__icon"><i data-lucide="hard-drive"></i></div>
+        <h3>Mind the space</h3>
+        <p>The app is about 45 MB. The Ubuntu environment adds roughly 375 MB, and the package cache grows as you install.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ TROUBLESHOOTING ============================ -->
+<section class="section">
+  <div class="shell">
+    <div class="section-head">
+      <p class="label">Troubleshooting</p>
+      <h2>When something does not work.</h2>
+    </div>
+
+    <div class="notes" data-accordion="single">
+      <div class="note">
+        <div class="acc">
+          <button class="acc__head" aria-expanded="false">The terminal says the environment is not installed<i data-lucide="plus"></i></button>
+          <div class="acc__body">Open the Terminal tab, then Linux environment, and install Ubuntu. The built-in Android shell still works in the meantime. If the install stops halfway, use the clean up option on that screen and try again.</div>
+        </div>
+      </div>
+      <div class="note">
+        <div class="acc">
+          <button class="acc__head" aria-expanded="false">The provider test fails<i data-lucide="plus"></i></button>
+          <div class="acc__body">Check three things: the base URL ends in <code>/v1</code>, the model id exists on that provider, and the key is correct. Some gateways only expose the models endpoint to logged-in requests, which is why Kern probes the chat endpoint instead.</div>
+        </div>
+      </div>
+      <div class="note">
+        <div class="acc">
+          <button class="acc__head" aria-expanded="false">The agent cannot see a folder<i data-lucide="plus"></i></button>
+          <div class="acc__body">Grant All files access in Android settings, under Apps, then Kern, then All files access. Without it, folders still work through the system picker and the SAF mirror.</div>
+        </div>
+      </div>
+      <div class="note">
+        <div class="acc">
+          <button class="acc__head" aria-expanded="false">A command keeps asking for approval<i data-lucide="plus"></i></button>
+          <div class="acc__body">Switch the permission mode above the composer to Auto edit or Full access. Destructive commands always ask, whatever the mode, and that is deliberate.</div>
+        </div>
+      </div>
+      <div class="note">
+        <div class="acc">
+          <button class="acc__head" aria-expanded="false">The install is interrupted<i data-lucide="plus"></i></button>
+          <div class="acc__body">The download is staged and only promoted when it completes, so an interrupted install never breaks a working environment. Check free space, then retry from the Linux environment screen.</div>
+        </div>
+      </div>
+      <div class="note">
+        <div class="acc">
+          <button class="acc__head" aria-expanded="false">Terminal sessions disappear when the app is closed<i data-lucide="plus"></i></button>
+          <div class="acc__body">Sessions survive navigation and backgrounding, but not the process being killed. The foreground service keeps them alive while the app is in the background, which covers almost every case.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ CTA ============================ -->
+<section class="section">
+  <div class="shell">
+    <div class="cta reveal">
+      <p class="label" style="color:rgb(var(--on-accent) / 0.7)">Ready</p>
+      <h2>Ten minutes to your first agent run.</h2>
+      <p>Download the build for your device and follow the steps above. Everything after that is up to you.</p>
+      <div class="mt-7 flex flex-wrap justify-center gap-3">
+        <a href="https://github.com/MurShidM01/Kern/releases/tag/v1.0.0%2B1" target="_blank" rel="noopener" class="btn btn--ghost">
+          <i data-lucide="download"></i>
+          Download v1.0.0
+        </a>
+        <a href="docs.html" class="btn" style="--btn-fg:rgb(var(--on-accent));--btn-bg:transparent;border-color:rgb(var(--on-accent))">
+          <i data-lucide="book-open"></i>
+          Read the docs
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="border-t-2 border-line bg-bg-alt">
+  <div class="shell flex flex-wrap items-center justify-between gap-3 py-6 text-[13px] text-muted">
+    <p>Copyright <span data-year>2026</span> Ali Khan Jalbani. MIT licensed.</p>
+    <p class="font-mono text-[12px]">
+      <a class="transition-colors hover:text-ink" href="https://github.com/MurShidM01/Kern" target="_blank" rel="noopener">github.com/MurShidM01/Kern</a>
+    </p>
+  </div>
+</footer>
+
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<script src="js/theme.js"></script>
+<script src="js/site.js"></script>
+<button type="button" class="totop" data-totop aria-label="Back to top">
+  <i data-lucide="arrow-up"></i>
+</button>
+
+</body>
+</html>
