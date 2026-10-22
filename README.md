@@ -26,6 +26,14 @@
 
 ---
 
+<div align="center">
+
+### [Read the website](https://murshidm01.github.io/Kern/) · [Documentation](https://murshidm01.github.io/Kern/docs.html) · [How to use](https://murshidm01.github.io/Kern/how-to.html)
+
+</div>
+
+---
+
 ## Kern: an AI coding agent for Android
 
 **Kern** turns your Android phone into a complete development environment. It pairs a real Linux terminal with an AI agent that can read your files, edit them, run your commands and check the result, all from a chat window.
