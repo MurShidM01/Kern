@@ -332,6 +332,75 @@ kbd {
 }
 
 /* --------------------------------------------------------------------------
+   4b. Navigation links
+   --------------------------------------------------------------------------
+   The active page is marked with an accent underline that grows in, and a
+   tinted pill behind it. The colour comes from the theme tokens, so it
+   follows the light and dark palettes.
+   -------------------------------------------------------------------------- */
+.navlink {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 13px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: rgb(var(--muted));
+  white-space: nowrap;
+  transition: color 0.18s var(--ease), background-color 0.18s var(--ease);
+}
+
+.navlink:hover {
+  color: rgb(var(--ink));
+  background: rgb(var(--surface-2));
+}
+
+/* The indicator itself. */
+.navlink::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 1px;
+  width: 0;
+  height: 3px;
+  border-radius: 999px;
+  background: rgb(var(--accent));
+  box-shadow: 0 0 10px rgb(var(--accent) / 0.6);
+  transform: translateX(-50%);
+  transition: width 0.3s var(--ease);
+}
+
+.navlink[aria-current="page"] {
+  color: rgb(var(--accent));
+  font-weight: 600;
+  background: rgb(var(--accent-soft));
+}
+
+.navlink[aria-current="page"]::after {
+  width: 20px;
+}
+
+/* The row variant is used in the mobile drawer, where a bar on the
+   leading edge reads better than an underline. */
+.navlink--row {
+  width: 100%;
+  border-radius: 9px;
+  padding: 11px 13px;
+  font-weight: 500;
+}
+
+.navlink--row::after {
+  display: none;
+}
+
+.navlink--row[aria-current="page"] {
+  border-left: 3px solid rgb(var(--accent));
+  padding-left: 10px;
+  background: rgb(var(--accent-soft));
+}
+
+/* --------------------------------------------------------------------------
    5. Cards
    -------------------------------------------------------------------------- */
 .card {
