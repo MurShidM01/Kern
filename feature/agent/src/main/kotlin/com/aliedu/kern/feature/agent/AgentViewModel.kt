@@ -144,6 +144,9 @@ class AgentViewModel @Inject constructor(
 
     private var adapter: WorkspaceAdapter? = null
     private var activeProfile: ProviderProfile? = null
+
+    /** Mirrors the Settings toggle, read at the start of every turn. */
+    private var memoryEnabled = true
     private var turnJob: Job?
         get() = sessionStore.turnJob
         set(value) {
@@ -188,6 +191,9 @@ class AgentViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            settingsRepository.memoryEnabled.collect { enabled -> memoryEnabled = enabled }
+        }
+        viewModelScope.launch {
             combine(
                 settingsRepository.chatFontSizeSp,
                 settingsRepository.showReasoning,
@@ -201,6 +207,9 @@ class AgentViewModel @Inject constructor(
                     )
                 }
         }
+        // Coming back to the screen (or a fresh ViewModel over a live session) has to re-attach the
+        // transcript, tool-event and todo observers, or the list never updates again.
+        _state.value.sessionId?.let { observeSession(it) }
         viewModelScope.launch {
             devServers.servers.collect { servers ->
                 _state.value = _state.value.copy(
@@ -314,7 +323,8 @@ class AgentViewModel @Inject constructor(
                     history = history,
                     userInput = input,
                     permissionMode = _state.value.permissionMode,
-                    todos = _state.value.todos
+                    todos = _state.value.todos,
+                    memoryEnabled = memoryEnabled
                 )
             ).collect { event -> handleEvent(sessionId, event, partial, lastReply) }
             // The turn ran to completion (not cancelled, not failed): the user may have left the
@@ -330,10 +340,14 @@ class AgentViewModel @Inject constructor(
             // Update the UI first: once this job is cancelled, any suspend call below would
             // immediately re-throw CancellationException, so the state change must not wait
             // on persistence. Persistence runs in a NonCancellable block.
+            // Stop is a user action, not a failure: no retry prompt, and every live affordance is
+            // dropped so the transcript cannot keep showing the stopped work.
             _state.value = _state.value.copy(
-                agentState = AgentState.CANCELLED,
+                agentState = AgentState.IDLE,
                 streamingText = "",
-                canRetry = true,
+                canRetry = false,
+                error = null,
+                runningTool = null,
                 liveCommand = null,
                 liveCommandOutput = ""
             )
@@ -640,8 +654,20 @@ class AgentViewModel @Inject constructor(
     }
 
     fun cancel() {
-        turnJob?.cancel()
         val sessionId = _state.value.sessionId
+        // Flip the UI first: the turn coroutine only notices the cancellation at its next
+        // suspension point, and until then the composer would still look busy and the stopped
+        // command would still be on screen.
+        _state.value = _state.value.copy(
+            agentState = AgentState.IDLE,
+            streamingText = "",
+            canRetry = false,
+            error = null,
+            runningTool = null,
+            liveCommand = null,
+            liveCommandOutput = ""
+        )
+        turnJob?.cancel()
         if (sessionId != null) {
             orchestrator.resolveApproval(sessionId, false)
             orchestrator.resolvePlan(sessionId, approved = false)
@@ -785,7 +811,13 @@ class AgentViewModel @Inject constructor(
 
     /** Resumes a persisted session, restoring its workspace and message history (T1-12). */
     fun loadSession(sessionId: String) {
-        if (_state.value.sessionId == sessionId) return
+        if (_state.value.sessionId == sessionId) {
+            // The turn state outlives this ViewModel, but the Room subscriptions do not. Without
+            // re-subscribing, the transcript stays frozen on whatever was on screen when the user
+            // left — which is exactly what a stopped turn looks like: old work, no new messages.
+            observeSession(sessionId)
+            return
+        }
         viewModelScope.launch {
             val session = sessionRepository.getSession(sessionId) ?: return@launch
             session.workspaceId?.let { workspaceId ->
