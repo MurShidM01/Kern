@@ -2,7 +2,7 @@
 (window.KERN_RELEASES = window.KERN_RELEASES || []).push({
   version: "1.0.2",
   build: "261029",
-  date: "2026-10-28",
+  date: "2026-10-29",
   tag: "v1.0.2+261029",
   headline: "Package installs are fixed, and the agent and the app got the polish they were missing.",
   summary:

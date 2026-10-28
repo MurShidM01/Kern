@@ -56,7 +56,7 @@ class AgentViewModelCancelTest {
     fun tearDown() = Dispatchers.resetMain()
 
     @Test
-    fun `cancelling a running turn marks the agent state cancelled`() = runTest(dispatcher) {
+    fun `cancelling a running turn ends it without offering a retry`() = runTest(dispatcher) {
         val orchestrator = mockk<AgentOrchestrator>()
         every { orchestrator.runTurn(any()) } returns flow {
             emit(AgentEvent.State(AgentState.REQUESTING_MODEL))
@@ -118,8 +118,13 @@ class AgentViewModelCancelTest {
         vm.cancel()
         advanceUntilIdle()
 
-        assertThat(vm.state.value.agentState).isEqualTo(AgentState.CANCELLED)
+        // Stop is a user action, not a failure: the composer goes idle, the partial output is
+        // dropped, and no retry prompt is left behind.
+        assertThat(vm.state.value.agentState).isEqualTo(AgentState.IDLE)
+        assertThat(vm.state.value.canRetry).isFalse()
+        assertThat(vm.state.value.error).isNull()
         assertThat(vm.state.value.streamingText).isEmpty()
+        assertThat(vm.state.value.isBusy).isFalse()
     }
 
     private fun workspace() = Workspace(
