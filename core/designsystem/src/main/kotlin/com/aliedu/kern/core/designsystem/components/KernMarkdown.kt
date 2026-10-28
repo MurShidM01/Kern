@@ -333,7 +333,7 @@ fun KernMarkdown(text: String, modifier: Modifier = Modifier, fontSizeSp: Float?
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(KernSpacing.sm)) {
         blocks.forEach { block ->
             when (block) {
-                is MdBlock.Heading -> Text(
+                is MdBlock.Heading -> KernSelectableText(
                     text = MarkdownParser.inline(block.text, codeStyle, linkColor, mentionColor),
                     style = when (block.level) {
                         1 -> typography.headlineSmall
@@ -344,7 +344,7 @@ fun KernMarkdown(text: String, modifier: Modifier = Modifier, fontSizeSp: Float?
                     color = MaterialTheme.colorScheme.onSurface
                 )
 
-                is MdBlock.Paragraph -> Text(
+                is MdBlock.Paragraph -> KernSelectableText(
                     text = MarkdownParser.inline(block.text, codeStyle, linkColor, mentionColor),
                     style = bodyStyle,
                     color = MaterialTheme.colorScheme.onSurface
@@ -359,7 +359,7 @@ fun KernMarkdown(text: String, modifier: Modifier = Modifier, fontSizeSp: Float?
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.width(KernSpacing.md)
                             )
-                            Text(
+                            KernSelectableText(
                                 text = MarkdownParser.inline(item, codeStyle, linkColor, mentionColor),
                                 style = bodyStyle,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -377,7 +377,7 @@ fun KernMarkdown(text: String, modifier: Modifier = Modifier, fontSizeSp: Float?
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.width(KernSpacing.lg)
                             )
-                            Text(
+                            KernSelectableText(
                                 text = MarkdownParser.inline(item, codeStyle, linkColor, mentionColor),
                                 style = bodyStyle,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -400,7 +400,7 @@ fun KernMarkdown(text: String, modifier: Modifier = Modifier, fontSizeSp: Float?
                             .background(MaterialTheme.colorScheme.primary, KernRadius.xsShape)
                     )
                     Spacer(Modifier.width(KernSpacing.sm))
-                    Text(
+                    KernSelectableText(
                         text = MarkdownParser.inline(block.text, codeStyle, linkColor, mentionColor),
                         style = smallStyle.copy(fontStyle = FontStyle.Italic),
                         color = MaterialTheme.colorScheme.onSurfaceVariant

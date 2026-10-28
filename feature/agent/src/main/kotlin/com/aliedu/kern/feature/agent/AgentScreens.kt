@@ -4,12 +4,15 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,7 +31,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
@@ -53,10 +55,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -82,6 +86,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import androidx.compose.ui.window.DialogProperties
 import com.aliedu.kern.core.agent.AgentState
 import com.aliedu.kern.core.designsystem.components.KernButton
@@ -92,6 +97,7 @@ import com.aliedu.kern.core.designsystem.components.KernIconBadge
 import com.aliedu.kern.core.designsystem.components.KernIconButton
 import com.aliedu.kern.core.designsystem.components.KernInfoNote
 import com.aliedu.kern.core.designsystem.components.KernMarkdown
+import com.aliedu.kern.core.designsystem.components.KernSelectableText
 import com.aliedu.kern.core.designsystem.components.KernOptionCard
 import com.aliedu.kern.core.designsystem.components.KernOutlinedButton
 import com.aliedu.kern.core.designsystem.components.KernPullToRefresh
@@ -148,8 +154,32 @@ fun AgentScreen(
     var showModelPicker by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    // True only when there is nothing left to scroll to. Checking that the last *item* is visible
+    // is not enough: a long streaming reply is one item, so its top can be on screen while the
+    // newest line sits far below the fold — which is exactly the case the jump button exists for.
+    val atEnd by remember { derivedStateOf { !listState.canScrollForward } }
+
+    // Whether the view should keep following the live end. Dragging the transcript away turns it
+    // off, so reading back through a long answer is never yanked to the bottom; returning to the
+    // end (or tapping the jump button) turns it back on.
+    var following by remember { mutableStateOf(true) }
+    val isDragged by listState.interactionSource.collectIsDraggedAsState()
+    LaunchedEffect(isDragged, atEnd) {
+        if (isDragged) following = false else if (atEnd) following = true
+    }
 
     val composerReserve = KernSizes.composerMaxHeight + KernSizes.composerScrim
+    // Measured composer height. The reserve above is a worst case; the real height changes with the
+    // error note, the retry row and the task chip, and using the reserve unconditionally left the
+    // newest reply rendering underneath the composer.
+    var composerHeight by remember { mutableIntStateOf(0) }
+    val density = LocalDensity.current
+    val composerPadding = if (composerHeight > 0) {
+        with(density) { composerHeight.toDp() } + KernSizes.composerScrim
+    } else {
+        composerReserve
+    }
     // Interleave messages and tool activity so each tool appears inline where the agent used it.
     val timeline = remember(state.messages, state.toolEvents) {
         buildTimeline(state.messages, state.toolEvents)
@@ -233,8 +263,17 @@ fun AgentScreen(
                         (if (showStreaming) 1 else 0) +
                         (if (showThinking) 1 else 0)
                     val totalItems = timeline.size + liveItems
-                    LaunchedEffect(totalItems) {
-                        if (state.autoScroll && totalItems > 0) listState.animateScrollToItem(totalItems - 1)
+                    // Follow the true bottom, not the top of the last item: top-aligning a reply
+                    // taller than the viewport leaves its newest line below the fold.
+                    LaunchedEffect(
+                        totalItems,
+                        state.streamingText.length,
+                        state.reasoningText.length,
+                        state.liveCommandOutput.length
+                    ) {
+                        if (state.autoScroll && following && totalItems > 0) {
+                            listState.scrollToItem(totalItems - 1, scrollOffset = Int.MAX_VALUE)
+                        }
                     }
                     LazyColumn(
                         state = listState,
@@ -243,7 +282,7 @@ fun AgentScreen(
                             start = KernSpacing.screenH,
                             end = KernSpacing.screenH,
                             top = KernSpacing.sm,
-                            bottom = composerReserve
+                            bottom = composerPadding
                         ),
                         verticalArrangement = Arrangement.spacedBy(KernSpacing.md)
                     ) {
@@ -290,32 +329,66 @@ fun AgentScreen(
                 }
             }
 
-            AgentComposer(
-                value = field,
-                onValueChange = { field = it },
-                mentionFiles = state.mentionFiles,
-                isBusy = state.isBusy,
-                noProvider = state.noProvider,
-                error = state.error,
-                canRetry = state.canRetry,
-                activeProfile = state.profiles.firstOrNull { it.id == state.activeProfileId },
-                fallbackModelLabel = state.providerLabel,
-                permissionMode = state.permissionMode,
-                thinkingEnabled = state.showReasoning,
-                todos = state.todos,
-                onConfigureProvider = onConfigureProvider,
-                onOpenModelPicker = { showModelPicker = true },
-                onPermissionModeChange = onPermissionModeChange,
-                onToggleThinking = onToggleThinking,
-                onSend = {
-                    val text = field.text
-                    field = TextFieldValue("")
-                    onSend(text)
-                },
-                onCancel = onCancel,
-                onRetry = onRetry,
-                modifier = Modifier.align(Alignment.BottomCenter)
-            )
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Sits directly above the composer, on the trailing edge so it never covers the
+                // permission chip on the leading side.
+                if (!isEmpty && !atEnd) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = KernSpacing.screenH, vertical = KernSpacing.xs),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        JumpToLatestButton(
+                            onClick = {
+                                scope.launch {
+                                    val last = listState.layoutInfo.totalItemsCount - 1
+                                    if (last >= 0) {
+                                        listState.scrollToItem(last, scrollOffset = Int.MAX_VALUE)
+                                        following = true
+                                    }
+                                }
+                            }
+                        )
+                    }
+                }
+                AgentComposer(
+                    value = field,
+                    onValueChange = { field = it },
+                    mentionFiles = state.mentionFiles,
+                    isBusy = state.isBusy,
+                    noProvider = state.noProvider,
+                    error = state.error,
+                    canRetry = state.canRetry,
+                    activeProfile = state.profiles.firstOrNull { it.id == state.activeProfileId },
+                    fallbackModelLabel = state.providerLabel,
+                    permissionMode = state.permissionMode,
+                    thinkingEnabled = state.showReasoning,
+                    todos = state.todos,
+                    onConfigureProvider = onConfigureProvider,
+                    onOpenModelPicker = { showModelPicker = true },
+                    onPermissionModeChange = onPermissionModeChange,
+                    onToggleThinking = onToggleThinking,
+                    onSend = {
+                        val text = field.text
+                        field = TextFieldValue("")
+                        onSend(text)
+                    },
+                    onCancel = onCancel,
+                    onRetry = onRetry,
+                    // The composer grows with the error note, the retry row and the task chip.
+                    // Measuring it keeps the transcript's bottom padding honest, so the newest
+                    // reply can never render underneath it.
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onGloballyPositioned { composerHeight = it.size.height }
+                )
+            }
         }
     }
 
@@ -466,6 +539,31 @@ private fun AgentWelcome(bottomReserve: androidx.compose.ui.unit.Dp, onPick: (St
 // ---------------------------------------------------------------------------------------------
 // Live command output — shown while an approved command runs (PRD §4.3 bullet 8)
 // ---------------------------------------------------------------------------------------------
+
+/**
+ * The "there is newer output below" affordance. A small flat circle above the composer: it appears
+ * whenever the transcript is scrolled away from the live end, so a long agent turn never leaves the
+ * user stranded in the middle of the history.
+ */
+@Composable
+private fun JumpToLatestButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier.size(32.dp),
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.primary,
+        border = BorderStroke(KernElevation.hairline, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = KernIcons.ArrowDown,
+                contentDescription = "Jump to the latest output",
+                modifier = Modifier.size(KernSizes.iconMd)
+            )
+        }
+    }
+}
 
 @Composable
 private fun LiveCommandRow(
@@ -1487,14 +1585,13 @@ private fun MessageBubble(message: Message, fontSizeSp: Float, showCopy: Boolean
                     shape = KernRadius.lgShape,
                     modifier = Modifier.widthIn(max = maxBubbleWidth)
                 ) {
-                    SelectionContainer {
-                        Text(
-                            text = message.content,
-                            style = bodyStyle,
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.padding(horizontal = KernSpacing.md, vertical = KernSpacing.sm)
-                        )
-                    }
+                    KernSelectableText(
+                        text = AnnotatedString(message.content),
+                        style = bodyStyle,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(horizontal = KernSpacing.md, vertical = KernSpacing.sm)
+                    )
                 }
             } else {
                 Column(
@@ -1508,9 +1605,7 @@ private fun MessageBubble(message: Message, fontSizeSp: Float, showCopy: Boolean
                         ReasoningRow(reasoning.trim(), streaming = false)
                     }
                     if (message.content.isNotBlank()) {
-                        SelectionContainer {
-                            KernMarkdown(message.content, fontSizeSp = fontSizeSp)
-                        }
+                        KernMarkdown(message.content, fontSizeSp = fontSizeSp)
                     }
                     if (message.status != MessageStatus.COMPLETE) {
                         Text(
@@ -1829,6 +1924,18 @@ private fun ToolRow(event: ToolEvent, liveOutput: String? = null) {
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                }
+                // A finished shell command ends on a prompt, the way a real terminal does. An output
+                // block that just stops on a blank line reads like a session that died.
+                if (event.toolName == "run_command" && event.status != ToolEventStatus.RUNNING) {
+                    Text(
+                        text = "\$",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontFamily = FontFamily.Monospace,
+                            lineHeight = 15.sp
+                        ),
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 }
             }
         }
