@@ -50,6 +50,36 @@ class ArchiveExtractorTest {
     }
 
     @Test
+    fun `a hard link that cannot be linked is copied with its mode`() {
+        val archive = tmp.newFile("hardlink.tar.gz")
+        TarTestFactory.write(
+            archive,
+            listOf(TarTestFactory.Entry("./usr/bin/perl5.38.2", "perl".toByteArray(), 0b111_111_111)),
+            hardLinks = listOf("./usr/bin/perl" to "./usr/bin/perl5.38.2")
+        )
+
+        val target = tmp.newFolder("out-link")
+        ArchiveExtractor().extractTarGz(archive, target)
+
+        val link = File(target, "usr/bin/perl")
+        assertThat(link.readText()).isEqualTo("perl")
+        // Windows cannot express the mode; the guest images are extracted on Android/Linux only.
+        if (System.getProperty("os.name")?.startsWith("Windows") != true) {
+            assertThat(java.nio.file.Files.isSameFile(link.toPath(), File(target, "usr/bin/perl5.38.2").toPath()) ||
+                link.canExecute()).isTrue()
+        }
+    }
+
+    @Test
+    fun `maps permission bits to a symbolic mode`() {
+        val extractor = ArchiveExtractor()
+        assertThat(extractor.symbolic(0b111_101_101)).isEqualTo("rwxr-xr-x")
+        assertThat(extractor.symbolic(0b110_100_100)).isEqualTo("rw-r--r--")
+        assertThat(extractor.symbolic(0b111_111_111)).isEqualTo("rwxrwxrwx")
+        assertThat(extractor.symbolic(0b000_000_000)).isEqualTo("---------")
+    }
+
+    @Test
     fun `rejects an entry that escapes the target directory`() {
         val archive = tmp.newFile("evil.tar.gz")
         TarTestFactory.write(archive, listOf(TarTestFactory.Entry("../../escape.txt", "x".toByteArray())))

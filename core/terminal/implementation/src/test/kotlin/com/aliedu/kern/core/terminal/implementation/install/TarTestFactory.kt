@@ -17,6 +17,7 @@ object TarTestFactory {
         file: File,
         entries: List<Entry>,
         symlinks: List<Pair<String, String>> = emptyList(),
+        hardLinks: List<Pair<String, String>> = emptyList(),
         format: String = ArchiveFormat.TAR_GZ
     ) {
         val raw: OutputStream = when (format) {
@@ -36,6 +37,13 @@ object TarTestFactory {
             symlinks.forEach { (name, target) ->
                 val link = TarArchiveEntry(name, TarConstants.LF_SYMLINK)
                 link.linkName = target
+                tar.putArchiveEntry(link)
+                tar.closeArchiveEntry()
+            }
+            hardLinks.forEach { (name, target) ->
+                val link = TarArchiveEntry(name, TarConstants.LF_LINK)
+                link.linkName = target
+                link.mode = 0b111_111_111
                 tar.putArchiveEntry(link)
                 tar.closeArchiveEntry()
             }
