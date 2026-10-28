@@ -15,8 +15,15 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * The pull-to-refresh container used across every screen.
@@ -28,6 +35,12 @@ import androidx.compose.ui.Modifier
  *
  * [content] must be scrollable (a `LazyColumn`, or a `Column` with `verticalScroll`) for the
  * gesture to reach this container; [KernRefreshableState] provides that for centred state views.
+ *
+ * **The minimum-visible hold is not cosmetic.** Material's indicator only animates back to rest
+ * when `isRefreshing` goes true and then false. Most screens here refresh from cached flows and
+ * finish inside a single frame, so the flag never became observable: the indicator stayed parked at
+ * the pulled position and looked stuck on screen. Holding it for [MIN_VISIBLE_MS] guarantees the
+ * true→false transition the animation needs, and makes a fast refresh feel deliberate.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,15 +51,27 @@ fun KernPullToRefresh(
     content: @Composable BoxScope.() -> Unit
 ) {
     val state = rememberPullToRefreshState()
+    val scope = rememberCoroutineScope()
+    var holding by remember { mutableStateOf(false) }
+    val showing = isRefreshing || holding
     PullToRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh = onRefresh,
+        isRefreshing = showing,
+        onRefresh = {
+            if (!holding) {
+                holding = true
+                scope.launch {
+                    delay(MIN_VISIBLE_MS)
+                    holding = false
+                }
+            }
+            onRefresh()
+        },
         state = state,
         modifier = modifier,
         indicator = {
             PullToRefreshDefaults.Indicator(
                 state = state,
-                isRefreshing = isRefreshing,
+                isRefreshing = showing,
                 modifier = Modifier.align(Alignment.TopCenter),
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                 color = MaterialTheme.colorScheme.primary
@@ -55,6 +80,9 @@ fun KernPullToRefresh(
         content = content
     )
 }
+
+/** How long the indicator stays up after a refresh, even when the work finished instantly. */
+private const val MIN_VISIBLE_MS = 550L
 
 /**
  * Hosts a centred state view (empty / error / loading) inside a [KernPullToRefresh].
