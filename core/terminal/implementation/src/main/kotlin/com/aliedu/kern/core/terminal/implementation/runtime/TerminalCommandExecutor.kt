@@ -88,15 +88,16 @@ class TerminalCommandExecutor @Inject constructor(
         val workspace = resolver.prepare(request.workspaceId)
         val cwd = request.cwd.takeIf { it.isNotBlank() } ?: workspace.workingDirectory
         val session = resolveSession(request.workspaceId, cwd)
-        // The agent keeps ONE shell per workspace. A command for another directory becomes a `cd`
-        // inside that shell instead of a brand-new session, so a long task cannot leave a pile of
-        // half-used shells behind.
-        val alreadyThere = tracker.cwd(request.workspaceId) == cwd
-        val command = if (alreadyThere) {
-            request.command
-        } else {
-            "cd -- " + shellQuote(cwd) + " && " + request.command
-        }
+        // The agent keeps ONE shell per workspace and every command starts in the workspace root.
+        // Always re-entering the directory (rather than trusting the tracked cwd) is what stops a
+        // `cd /sdcard/Downloads` inside one command from silently moving every later command out of
+        // the project — the tracker cannot see the shell's real directory, so it must not guess.
+        //
+        // The cd must not be fatal. [cwd] is a host path, and an app-managed workspace lives under
+        // /data/user/0/<package>/…, which is not bound inside the rootfs: with `&&` every guest
+        // command (apt, dpkg, the package catalogue) died with "No such file or directory" even
+        // though the command itself had nothing to do with the workspace.
+        val command = "cd -- " + shellQuote(cwd) + " 2>/dev/null || true; " + request.command
 
         val marker = "__KERN_DONE_" + UUID.randomUUID().toString().replace("-", "") + "__"
         val script = command + "\nprintf '\\n" + marker + " %s\\n' \"${'$'}?\"\n"
@@ -195,13 +196,7 @@ class TerminalCommandExecutor @Inject constructor(
             // session instead of writing into a dead one.
             tracker.unbind(request.workspaceId, session.id)
         } else {
-            val settled = if (exitCode == 0 || alreadyThere) {
-                cwd
-            } else {
-                // The `cd` may have failed; keep the directory the shell actually has.
-                tracker.cwd(request.workspaceId) ?: cwd
-            }
-            tracker.bind(request.workspaceId, session.id, settled)
+            tracker.bind(request.workspaceId, session.id, cwd)
         }
         tracker.record(
             request.workspaceId,

@@ -202,7 +202,10 @@ class TerminalCommandExecutorTest {
         val runtime = FakeRuntime()
         executor(runtime).run(request("echo hi"))
         val script = runtime.sentScripts.single()
-        assertThat(script).startsWith("echo hi\n")
+        // Every command is prefixed with a cd into the workspace, so the agent cannot drift out of
+        // it after an earlier command changed directory. The cd is best-effort: a workspace path the
+        // rootfs cannot see must not fail the command itself.
+        assertThat(script).startsWith("cd -- '/exec/ws' 2>/dev/null || true; echo hi\n")
         assertThat(script).contains("printf")
         assertThat(script).contains("$?")
     }
