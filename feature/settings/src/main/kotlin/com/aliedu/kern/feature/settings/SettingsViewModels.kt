@@ -2,6 +2,7 @@ package com.aliedu.kern.feature.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.aliedu.kern.core.agent.WorkspaceNotes
 import com.aliedu.kern.core.data.preferences.SettingsRepository
 import com.aliedu.kern.core.data.repository.ProviderRepository
 import com.aliedu.kern.core.data.repository.SessionRepository
@@ -21,11 +22,25 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import java.net.URL
 import java.util.UUID
 import javax.inject.Inject
+
+/** State of the manual "check for updates" flow in About Kern. */
+data class UpdateUiState(
+    val checking: Boolean = false,
+    /** Non-null once a newer release has been found and its dialog should be shown. */
+    val info: UpdateInfo? = null,
+    val downloading: Boolean = false,
+    val progress: Float = 0f,
+    /** One-line result shown under the row: "up to date", or why the check failed. */
+    val message: String? = null
+)
 
 data class SettingsUiState(
     val refreshing: Boolean = false,
@@ -39,11 +54,16 @@ data class SettingsUiState(
     val terminalScrollback: Int = 1000,
     val showReasoning: Boolean = true,
     val autoScroll: Boolean = true,
+    /** Whether workspace memory is injected into a turn. */
+    val memoryEnabled: Boolean = true,
+    /** Transient confirmation shown under the memory rows after a clear. */
+    val memoryMessage: String? = null,
     val profiles: List<ProviderProfile> = emptyList(),
     val defaultProfileId: String? = null,
     /** True when the default profile is set but its stored API key is missing/unreadable. */
     val defaultProviderKeyMissing: Boolean = false,
-    val sessionCount: Int = 0
+    val sessionCount: Int = 0,
+    val update: UpdateUiState = UpdateUiState()
 )
 
 @HiltViewModel
@@ -52,7 +72,9 @@ class SettingsViewModel @Inject constructor(
     private val providerRepository: ProviderRepository,
     private val sessionRepository: SessionRepository,
     private val credentialStore: CredentialStore,
-    private val providerAdapter: AiProviderAdapter
+    private val providerAdapter: AiProviderAdapter,
+    private val updateRepository: UpdateRepository,
+    private val workspaceNotes: WorkspaceNotes
 ) : ViewModel() {
 
     private data class Appearance(
@@ -65,7 +87,8 @@ class SettingsViewModel @Inject constructor(
     private data class Chat(
         val chatFontSizeSp: Float,
         val showReasoning: Boolean,
-        val autoScroll: Boolean
+        val autoScroll: Boolean,
+        val memoryEnabled: Boolean
     )
 
     private data class Terminal(
@@ -83,10 +106,16 @@ class SettingsViewModel @Inject constructor(
     private data class Derived(
         val sessionCount: Int,
         val refreshing: Boolean,
-        val keyMissing: Boolean
+        val keyMissing: Boolean,
+        val update: UpdateUiState,
+        val memoryMessage: String?
     )
 
     private val refreshing = MutableStateFlow(false)
+    private val memoryMessage = MutableStateFlow<String?>(null)
+
+    /** Owned by the repository, because the cold-start splash starts the check before this exists. */
+    private val update = updateRepository.state
 
     /** Bumped by [refresh] so the credential check below is re-run on demand. */
     private val credentialRecheck = MutableStateFlow(0)
@@ -120,9 +149,10 @@ class SettingsViewModel @Inject constructor(
         combine(
             settingsRepository.chatFontSizeSp,
             settingsRepository.showReasoning,
-            settingsRepository.autoScroll
-        ) { chatFontSizeSp, showReasoning, autoScroll ->
-            Chat(chatFontSizeSp, showReasoning, autoScroll)
+            settingsRepository.autoScroll,
+            settingsRepository.memoryEnabled
+        ) { chatFontSizeSp, showReasoning, autoScroll, memoryEnabled ->
+            Chat(chatFontSizeSp, showReasoning, autoScroll, memoryEnabled)
         },
         combine(
             settingsRepository.terminalFontSizeSp,
@@ -140,8 +170,12 @@ class SettingsViewModel @Inject constructor(
         combine(
             sessionRepository.observeSessionCount(),
             refreshing,
-            keyMissing
-        ) { count, isRefreshing, missing -> Derived(count, isRefreshing, missing) }
+            keyMissing,
+            update,
+            memoryMessage
+        ) { count, isRefreshing, missing, updateState, memory ->
+            Derived(count, isRefreshing, missing, updateState, memory)
+        }
     ) { appearance, chat, terminal, providers, derived ->
         SettingsUiState(
             refreshing = derived.refreshing,
@@ -155,10 +189,13 @@ class SettingsViewModel @Inject constructor(
             terminalScrollback = terminal.terminalScrollback,
             showReasoning = chat.showReasoning,
             autoScroll = chat.autoScroll,
+            memoryEnabled = chat.memoryEnabled,
+            memoryMessage = derived.memoryMessage,
             profiles = providers.profiles,
             defaultProfileId = providers.defaultProfileId,
             defaultProviderKeyMissing = derived.keyMissing,
-            sessionCount = derived.sessionCount
+            sessionCount = derived.sessionCount,
+            update = derived.update
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
@@ -191,6 +228,26 @@ class SettingsViewModel @Inject constructor(
     fun setAutoScroll(enabled: Boolean) =
         viewModelScope.launch { settingsRepository.setAutoScroll(enabled) }
 
+    fun setMemoryEnabled(enabled: Boolean) =
+        viewModelScope.launch { settingsRepository.setMemoryEnabled(enabled) }
+
+    /**
+     * Deletes every workspace's memory file. The agent reads memory from disk at the start of a
+     * turn, so the next turn simply starts with nothing remembered.
+     */
+    fun clearMemory() {
+        viewModelScope.launch {
+            val removed = withContext(Dispatchers.IO) { workspaceNotes.clearAllMemory() }
+            memoryMessage.value = if (removed > 0) {
+                "Memory cleared for every workspace."
+            } else {
+                "There was no saved memory to clear."
+            }
+            delay(3_000)
+            memoryMessage.value = null
+        }
+    }
+
     fun setDefaultProfile(id: String) = viewModelScope.launch { providerRepository.setDefault(id) }
 
     fun deleteProfile(id: String) = viewModelScope.launch { providerRepository.delete(id) }
@@ -209,6 +266,23 @@ class SettingsViewModel @Inject constructor(
             refreshing.value = false
         }
     }
+
+    // ---- Updates ---------------------------------------------------------------------------
+
+    /**
+     * Asks GitHub for the newest release and compares it with [currentVersion] (the running build's
+     * version name, supplied by the screen so this module never depends on the app's BuildConfig).
+     */
+    fun checkForUpdates(currentVersion: String) {
+        viewModelScope.launch { updateRepository.check(currentVersion) }
+    }
+
+    /** Downloads the offered APK, then hands it to the system installer. */
+    fun downloadUpdate() = updateRepository.downloadUpdate()
+
+    fun openReleasePage() = updateRepository.openReleasePageForCurrent()
+
+    fun dismissUpdate() = updateRepository.dismiss()
 
     // ---- Provider models sheet -------------------------------------------------------------
 

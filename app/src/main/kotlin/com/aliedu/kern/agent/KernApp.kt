@@ -413,6 +413,8 @@ fun KernApp(
                             onTerminalScrollbackChange = settingsViewModel::setTerminalScrollback,
                             onShowReasoningChange = settingsViewModel::setShowReasoning,
                             onAutoScrollChange = settingsViewModel::setAutoScroll,
+                            onMemoryEnabledChange = settingsViewModel::setMemoryEnabled,
+                            onClearMemory = settingsViewModel::clearMemory,
                             onAddProvider = { navController.navigate(Routes.provider(null)) },
                             onEditProvider = { id -> navController.navigate(Routes.provider(id)) },
                             modelsSheet = modelsSheet,
@@ -422,7 +424,13 @@ fun KernApp(
                             onSetDefaultProvider = settingsViewModel::setDefaultProfile,
                             onDeleteProvider = settingsViewModel::deleteProfile,
                             onClearSessions = settingsViewModel::clearAllSessions,
-                            onRefresh = settingsViewModel::refresh
+                            onRefresh = settingsViewModel::refresh,
+                            onCheckForUpdates = {
+                                settingsViewModel.checkForUpdates(BuildConfig.VERSION_NAME)
+                            },
+                            onDownloadUpdate = settingsViewModel::downloadUpdate,
+                            onOpenReleasePage = settingsViewModel::openReleasePage,
+                            onDismissUpdate = settingsViewModel::dismissUpdate
                         )
                     }
 

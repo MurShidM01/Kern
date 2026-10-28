@@ -32,8 +32,12 @@ dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:designsystem"))
     implementation(project(":core:data"))
+    // Clearing workspace memory deletes the agent's own note files.
+    implementation(project(":core:agent"))
     implementation(project(":core:providers:api"))
     implementation(project(":core:auth"))
+    // FileProvider for handing a downloaded update APK to the package installer.
+    implementation(libs.androidx.core.ktx)
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)

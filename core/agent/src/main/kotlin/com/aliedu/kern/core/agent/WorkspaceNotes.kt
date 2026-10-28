@@ -67,6 +67,25 @@ class WorkspaceNotes(
     fun memory(workspace: Workspace): String? =
         read(File(directory(workspace), MEMORY_FILE))?.takeIf { it.isNotBlank() }
 
+    /**
+     * Deletes every workspace's memory file, leaving plans and archived plans alone.
+     *
+     * It walks the plans directory rather than the workspace list so memory written for a workspace
+     * that has since been removed is cleared too. Returns how many files were deleted.
+     */
+    fun clearAllMemory(): Int {
+        val plans = File(root, PLANS_DIR).takeIf { it.isDirectory } ?: return 0
+        return plans.listFiles().orEmpty()
+            .filter { it.isDirectory }
+            .count { dir -> runCatching { File(dir, MEMORY_FILE).delete() }.getOrDefault(false) }
+    }
+
+    /** True when any workspace has a memory file — used to enable the settings action. */
+    fun hasMemory(): Boolean {
+        val plans = File(root, PLANS_DIR).takeIf { it.isDirectory } ?: return false
+        return plans.listFiles().orEmpty().any { File(it, MEMORY_FILE).isFile }
+    }
+
     /** Appends one durable fact under its section, skipping an exact duplicate. */
     fun remember(workspace: Workspace, note: MemoryNote) {
         val bullet = "- ${note.text.trim()}"
@@ -79,6 +98,8 @@ class WorkspaceNotes(
         if (current.isBlank()) {
             lines.clear()
             lines.add("# Memory — ${workspace.displayName}")
+            lines.add("")
+            lines.add(HEADER_NOTE)
             lines.add("")
         }
         val index = lines.indexOfFirst { it.trim().equals(heading, ignoreCase = true) }
@@ -112,6 +133,8 @@ class WorkspaceNotes(
         if (current.isBlank()) {
             lines.clear()
             lines.add("# Memory — ${workspace.displayName}")
+            lines.add("")
+            lines.add(HEADER_NOTE)
             lines.add("")
         }
         val heading = "## Task log"
@@ -190,5 +213,12 @@ class WorkspaceNotes(
         const val MEMORY_FILE = "memory.md"
         const val ARCHIVE_DIR = "archive"
         const val MAX_TASK_LOG = 40
+
+        /**
+         * Written under the title so anyone reading the file — the user included — knows what it is
+         * for. The agent gets the same rule in the prompt: reference, not a task list.
+         */
+        const val HEADER_NOTE =
+            "_Notes about this workspace, written by the agent. Reference only: not a task list._"
     }
 }

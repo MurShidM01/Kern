@@ -109,5 +109,11 @@ data class TurnRequest(
      * The session's persisted task list, so a resumed or retried turn continues the existing plan
      * instead of starting over (PRD §4.3 bullet 1).
      */
-    val todos: List<Todo> = emptyList()
+    val todos: List<Todo> = emptyList(),
+
+    /**
+     * Whether this workspace's memory notes are injected into the prompt (and appended to when the
+     * turn ends). Off means the model never sees them, so nothing from an older task can leak in.
+     */
+    val memoryEnabled: Boolean = true
 )

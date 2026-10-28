@@ -25,6 +25,13 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
+    <!--
+      In-app update: the Settings "Check for updates" flow downloads the release APK into the app
+      cache and hands it to the system installer. Android still asks the user to allow installs from
+      Kern the first time, which is the only thing this permission unlocks.
+    -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <application
         android:name=".KernApplication"
         android:allowBackup="false"
@@ -71,6 +78,17 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Long-running AI agent turns that must finish in the background" />
         </service>
+
+        <!-- Serves the downloaded update APK to the package installer. Cache only. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
     </application>
 

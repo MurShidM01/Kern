@@ -38,6 +38,8 @@ interface SettingsRepository {
     val terminalScrollback: Flow<Int>
     val showReasoning: Flow<Boolean>
     val autoScroll: Flow<Boolean>
+    /** Whether the workspace's memory notes are injected into a turn at all. */
+    val memoryEnabled: Flow<Boolean>
     val permissionMode: Flow<PermissionMode>
     val lastWorkspaceId: Flow<String?>
     val onboardingCompleted: Flow<Boolean>
@@ -52,6 +54,7 @@ interface SettingsRepository {
     suspend fun setTerminalScrollback(lines: Int)
     suspend fun setShowReasoning(enabled: Boolean)
     suspend fun setAutoScroll(enabled: Boolean)
+    suspend fun setMemoryEnabled(enabled: Boolean)
     suspend fun setPermissionMode(mode: PermissionMode)
     suspend fun setLastWorkspaceId(id: String?)
     suspend fun setOnboardingCompleted(completed: Boolean)
@@ -97,6 +100,8 @@ class DataStoreSettingsRepository @Inject constructor(
     override val showReasoning: Flow<Boolean> = store.data.map { it[KEY_SHOW_REASONING] ?: true }
 
     override val autoScroll: Flow<Boolean> = store.data.map { it[KEY_AUTO_SCROLL] ?: true }
+
+    override val memoryEnabled: Flow<Boolean> = store.data.map { it[KEY_MEMORY] ?: true }
 
     override val permissionMode: Flow<PermissionMode> = store.data.map { prefs ->
         val raw = prefs[KEY_PERMISSION_MODE]
@@ -149,6 +154,10 @@ class DataStoreSettingsRepository @Inject constructor(
         store.edit { it[KEY_AUTO_SCROLL] = enabled }
     }
 
+    override suspend fun setMemoryEnabled(enabled: Boolean) {
+        store.edit { it[KEY_MEMORY] = enabled }
+    }
+
     override suspend fun setPermissionMode(mode: PermissionMode) {
         store.edit { it[KEY_PERMISSION_MODE] = mode.name }
     }
@@ -174,6 +183,7 @@ class DataStoreSettingsRepository @Inject constructor(
         val KEY_TERMINAL_SCROLLBACK = intPreferencesKey("terminal_scrollback")
         val KEY_SHOW_REASONING = booleanPreferencesKey("show_reasoning")
         val KEY_AUTO_SCROLL = booleanPreferencesKey("auto_scroll")
+        val KEY_MEMORY = booleanPreferencesKey("workspace_memory")
         val KEY_PERMISSION_MODE = stringPreferencesKey("permission_mode")
         val KEY_LAST_WORKSPACE = stringPreferencesKey("last_workspace_id")
         val KEY_ONBOARDING = booleanPreferencesKey("onboarding_completed")

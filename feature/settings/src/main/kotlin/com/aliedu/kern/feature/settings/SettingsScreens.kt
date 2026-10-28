@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -25,6 +27,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -51,11 +54,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aliedu.kern.core.designsystem.components.KernButton
 import com.aliedu.kern.core.designsystem.components.KernConfirmDialog
+import com.aliedu.kern.core.designsystem.components.KernDialog
 import com.aliedu.kern.core.designsystem.components.KernDropdownItem
 import com.aliedu.kern.core.designsystem.components.KernDropdownMenu
 import com.aliedu.kern.core.designsystem.components.KernIconBadge
 import com.aliedu.kern.core.designsystem.components.KernIconButton
 import com.aliedu.kern.core.designsystem.components.KernInfoNote
+import com.aliedu.kern.core.designsystem.components.KernListRow
 import com.aliedu.kern.core.designsystem.components.KernOptionCard
 import com.aliedu.kern.core.designsystem.components.KernOutlinedButton
 import com.aliedu.kern.core.designsystem.components.KernPaletteSwatch
@@ -99,6 +104,8 @@ fun SettingsScreen(
     onTerminalScrollbackChange: (Int) -> Unit,
     onShowReasoningChange: (Boolean) -> Unit,
     onAutoScrollChange: (Boolean) -> Unit,
+    onMemoryEnabledChange: (Boolean) -> Unit,
+    onClearMemory: () -> Unit,
     onAddProvider: () -> Unit,
     onEditProvider: (String) -> Unit,
     modelsSheet: ProviderModelsUiState,
@@ -108,10 +115,15 @@ fun SettingsScreen(
     onSetDefaultProvider: (String) -> Unit,
     onDeleteProvider: (String) -> Unit,
     onClearSessions: () -> Unit,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    onCheckForUpdates: () -> Unit,
+    onDownloadUpdate: () -> Unit,
+    onOpenReleasePage: () -> Unit,
+    onDismissUpdate: () -> Unit
 ) {
     var pendingDeleteId by remember { mutableStateOf<String?>(null) }
     var confirmClearSessions by remember { mutableStateOf(false) }
+    var confirmClearMemory by remember { mutableStateOf(false) }
     val dark = isDarkTheme(state.themeMode)
 
     KernScaffold(
@@ -163,6 +175,32 @@ fun SettingsScreen(
                     checked = state.autoScroll,
                     onCheckedChange = onAutoScrollChange
                 )
+            }
+
+            KernSettingsGroup(title = "Memory") {
+                SwitchSettingRow(
+                    icon = KernIcons.Sparkle,
+                    title = "Workspace memory",
+                    subtitle = "Let the agent keep notes about this project and read them in later " +
+                        "tasks. Notes are reference only — they never start work on their own. " +
+                        "Turn this off to keep memory out of every prompt.",
+                    checked = state.memoryEnabled,
+                    onCheckedChange = onMemoryEnabledChange
+                )
+                KernSettingDivider()
+                KernListRow(
+                    title = "Clear memory",
+                    subtitle = "Delete the saved notes for every workspace. Plans are kept.",
+                    leading = KernIcons.Clear,
+                    onClick = { confirmClearMemory = true }
+                )
+                state.memoryMessage?.let { message ->
+                    KernInfoNote(
+                        text = message,
+                        tone = KernTone.SUCCESS,
+                        modifier = Modifier.padding(horizontal = KernSpacing.md)
+                    )
+                }
             }
 
             KernSettingsGroup(title = "Editor") {
@@ -324,6 +362,24 @@ fun SettingsScreen(
                 AboutRow("Open-source", "Kotlin · Compose · Material 3 · Hilt · Room · OkHttp")
                 KernSettingDivider()
                 AboutRow("License", "Apache-2.0")
+                KernSettingDivider()
+                KernListRow(
+                    title = if (state.update.checking) "Checking for updates…" else "Check for updates",
+                    subtitle = state.update.message
+                        ?: "Look for a newer release on GitHub and install it from here.",
+                    leading = KernIcons.Download,
+                    leadingTint = MaterialTheme.colorScheme.primary,
+                    trailing = {
+                        if (state.update.checking || state.update.downloading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(KernSizes.iconMd),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    },
+                    onClick = if (state.update.checking) null else onCheckForUpdates
+                )
             }
             }
         }
@@ -356,6 +412,74 @@ fun SettingsScreen(
                 confirmClearSessions = false
             },
             onDismiss = { confirmClearSessions = false }
+        )
+    }
+
+    state.update.info?.let { info ->
+        val hasApk = info.downloadUrl != null
+        KernDialog(
+            title = "Kern " + info.version + " is available",
+            icon = KernIcons.Download,
+            onDismiss = onDismissUpdate,
+            dismissLabel = "Later",
+            confirmLabel = when {
+                state.update.downloading -> "Downloading…"
+                hasApk -> "Download and install"
+                else -> "Open release page"
+            },
+            confirmEnabled = !state.update.downloading,
+            onConfirm = { if (hasApk) onDownloadUpdate() else onOpenReleasePage() },
+            content = {
+                Text(
+                    text = "You are on v" + appVersion + ". Updating keeps your workspaces, settings " +
+                        "and saved provider profiles.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (info.notes.isNotBlank()) {
+                    Text(
+                        text = info.notes,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 220.dp)
+                            .verticalScroll(rememberScrollState())
+                    )
+                }
+                if (state.update.downloading) {
+                    LinearProgressIndicator(
+                        progress = { state.update.progress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(3.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                    )
+                }
+                state.update.message?.let { message ->
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        )
+    }
+
+    if (confirmClearMemory) {
+        KernConfirmDialog(
+            title = "Clear workspace memory?",
+            message = "Every workspace's saved notes will be deleted. Plans and archived plans " +
+                "are kept, and nothing in your projects is touched.",
+            confirmLabel = "Clear memory",
+            onConfirm = {
+                confirmClearMemory = false
+                onClearMemory()
+            },
+            onDismiss = { confirmClearMemory = false },
+            icon = KernIcons.Clear
         )
     }
 

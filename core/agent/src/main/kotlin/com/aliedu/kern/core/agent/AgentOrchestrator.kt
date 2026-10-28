@@ -127,7 +127,7 @@ class AgentOrchestrator @Inject constructor(
             projectRules = projectRulesLoader.load(request.adapter),
             todos = request.todos,
             plan = notes.plan(request.workspace),
-            memory = notes.memory(request.workspace)
+            memory = if (request.memoryEnabled) notes.memory(request.workspace) else null
         ).toMutableList()
         val usedTools = LinkedHashSet<String>()
         // The live task list, updated as the model calls update_todos, so a turn that stops with
@@ -294,8 +294,9 @@ class AgentOrchestrator @Inject constructor(
 
                 // The task is finished: record what was done in the workspace memory. This is the
                 // automatic half of the memory system — it does not depend on the model remembering
-                // to call remember, so every task leaves a trail the next one can read.
-                runCatching {
+                // to call remember, so every task leaves a trail the next one can read. It is skipped
+                // entirely when the user turned memory off.
+                if (request.memoryEnabled) runCatching {
                     notes.appendTaskLog(
                         workspace = request.workspace,
                         request = request.userInput,
