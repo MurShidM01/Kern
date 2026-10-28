@@ -128,6 +128,6 @@ object ProotCommand {
     private const val PROMPT = "$ "
     private const val DEFAULT_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-    /** A busybox applet every Alpine rootfs ships, with no output and a zero exit status. */
+    /** A trivial binary every rootfs ships, with no output and a zero exit status. */
     private const val PROBE_COMMAND = "/bin/true"
 }

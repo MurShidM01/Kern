@@ -409,7 +409,7 @@ private fun LinuxStep(viewModel: EnvironmentSetupViewModel) {
         StepHeading(
             title = "Set up Linux for the terminal",
             subtitle = "Kern ships a native shell. Optionally add a Linux userspace to run " +
-                "package tools such as apk, git and python inside the terminal."
+                "package tools such as apt, git and python inside the terminal."
         )
 
         // The distribution is chosen here, not after onboarding: the first-run wizard is where a

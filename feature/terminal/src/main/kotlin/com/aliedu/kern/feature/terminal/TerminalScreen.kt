@@ -372,7 +372,7 @@ private fun EnvironmentBanner(environment: EnvironmentInfo?, onOpen: () -> Unit)
         detail = if (installed) {
             environment?.detail ?: "The Linux environment cannot run on this device."
         } else {
-            "Set up a Linux environment for package tools such as apk, apt, git and python."
+            "Set up a Linux environment for package tools such as apt, git and python."
         },
         tone = if (installed) KernTone.ERROR else KernTone.WARNING,
         icon = KernIcons.Terminal,

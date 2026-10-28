@@ -125,7 +125,7 @@ class DistroInstaller @Inject constructor(
         val usable = runtimeUsable(record)
         EnvironmentInfo(
             state = EnvironmentState.READY,
-            distroId = record.distroId ?: "alpine",
+            distroId = record.distroId ?: "linux",
             distroName = name,
             version = record.version,
             installPath = paths.rootfs.absolutePath,

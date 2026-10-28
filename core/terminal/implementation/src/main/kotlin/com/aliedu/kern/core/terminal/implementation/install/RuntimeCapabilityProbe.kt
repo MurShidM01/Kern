@@ -83,7 +83,7 @@ class RuntimeCapabilityProbe @Inject constructor(private val paths: TerminalPath
      * terminal.
      */
     suspend fun probeLaunch(rootfs: File): ProbeResult {
-        if (!rootfs.isDirectory) return ProbeResult(false, "The Alpine rootfs is missing.")
+        if (!rootfs.isDirectory) return ProbeResult(false, "The Linux rootfs is missing.")
         val launcher = ProotLauncher.resolve(paths.nativeLibraryDir, paths.runtime)
             ?: return ProbeResult(false, "The proot launcher is unavailable on this device.")
 
