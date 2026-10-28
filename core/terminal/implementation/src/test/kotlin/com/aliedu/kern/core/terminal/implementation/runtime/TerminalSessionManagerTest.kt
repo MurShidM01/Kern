@@ -4,6 +4,7 @@ import com.aliedu.kern.core.terminal.api.ExecutionWorkspace
 import com.aliedu.kern.core.terminal.api.SessionKind
 import com.aliedu.kern.core.terminal.api.TerminalOutput
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -65,10 +66,10 @@ class TerminalSessionManagerTest {
         val s = m.create(ExecutionWorkspace("w", "/w"), SessionKind.DEVICE_SHELL)
 
         val received = CopyOnWriteArrayList<String>()
-        val job = launch(Dispatchers.IO) {
+        // UNDISPATCHED subscribes before returning, so the emit below cannot race the collector.
+        val job = launch(Dispatchers.IO, start = CoroutineStart.UNDISPATCHED) {
             m.observe(s.id).collect { if (it is TerminalOutput.Stdout) received.add(it.text) }
         }
-        Thread.sleep(100)
         backend.processes.first().emit("world")
 
         assertThat(waitUntil { received.joinToString("").contains("world") }).isTrue()
@@ -82,8 +83,9 @@ class TerminalSessionManagerTest {
         val s = m.create(ExecutionWorkspace("w", "/w"), SessionKind.DEVICE_SHELL)
 
         val received = CopyOnWriteArrayList<TerminalOutput>()
-        val job = launch(Dispatchers.IO) { m.observe(s.id).collect { received.add(it) } }
-        Thread.sleep(100)
+        val job = launch(Dispatchers.IO, start = CoroutineStart.UNDISPATCHED) {
+            m.observe(s.id).collect { received.add(it) }
+        }
         backend.processes.first().finish(0)
 
         assertThat(waitUntil { received.any { it is TerminalOutput.Exited } }).isTrue()
