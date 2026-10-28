@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='112' fill='%23151A2A'/%3E%3Cpath d='M176,146 H176 A30,30 0 0 1 206,176 V336 A30,30 0 0 1 176,366 H176 A30,30 0 0 1 146,336 V176 A30,30 0 0 1 176,146 Z' fill='%23fff'/%3E%3Cpath d='M339.67,143 L185.58,256 L339.67,369 L376.33,319 L290.42,256 L376.33,193 Z' fill='%23fff'/%3E%3Cpath d='M272,226 Q278,250 302,256 Q278,262 272,286 Q266,262 242,256 Q266,250 272,226 Z' fill='%2338BDF8'/%3E%3C/svg%3E">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kern Changelog - Every release, documented</title>
+<meta name="description" content="Every Kern release in one place: what changed, what was fixed and which build to download, from the first public release to the current version.">
+<meta name="keywords" content="Kern changelog, Kern releases, AI agent Android release notes, Kern v1.0.2, Ubuntu Android app update">
+<meta name="theme-color" content="#f4f3ef">
+<link rel="canonical" href="https://github.com/MurShidM01/Kern/blob/main/web/changelog.html">
+
+<meta property="og:type" content="article">
+<meta property="og:title" content="Kern Changelog">
+<meta property="og:description" content="Every Kern release, documented: new features, fixes and the build number to install.">
+
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='112' fill='%23151A2A'/%3E%3Cpath d='M176,146 H176 A30,30 0 0 1 206,176 V336 A30,30 0 0 1 176,366 H176 A30,30 0 0 1 146,336 V176 A30,30 0 0 1 176,146 Z' fill='%23fff'/%3E%3Cpath d='M339.67,143 L185.58,256 L339.67,369 L376.33,319 L290.42,256 L376.33,193 Z' fill='%23fff'/%3E%3Cpath d='M272,226 Q278,250 302,256 Q278,262 272,286 Q266,262 242,256 Q266,250 272,226 Z' fill='%2338BDF8'/%3E%3C/svg%3E">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        bg: "rgb(var(--bg) / <alpha-value>)",
+        "bg-alt": "rgb(var(--bg-alt) / <alpha-value>)",
+        surface: "rgb(var(--surface) / <alpha-value>)",
+        "surface-2": "rgb(var(--surface-2) / <alpha-value>)",
+        ink: "rgb(var(--ink) / <alpha-value>)",
+        muted: "rgb(var(--muted) / <alpha-value>)",
+        line: "rgb(var(--line) / <alpha-value>)",
+        "line-soft": "rgb(var(--line-soft) / <alpha-value>)",
+        accent: "rgb(var(--accent) / <alpha-value>)",
+        "accent-soft": "rgb(var(--accent-soft) / <alpha-value>)",
+        "on-accent": "rgb(var(--on-accent) / <alpha-value>)",
+        "accent-2": "rgb(var(--accent-2) / <alpha-value>)",
+        warn: "rgb(var(--warn) / <alpha-value>)",
+        ok: "rgb(var(--ok) / <alpha-value>)"
+      },
+      fontFamily: {
+        sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+        display: ["Space Grotesk", "ui-sans-serif", "system-ui", "sans-serif"],
+        mono: ["JetBrains Mono", "ui-monospace", "Menlo", "monospace"]
+      }
+    }
+  }
+};
+</script>
+<link rel="stylesheet" href="css/theme.css">
+<script>
+(function () {
+  try {
+    var t = localStorage.getItem("kern-theme");
+    if (!t) t = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    document.documentElement.setAttribute("data-theme", t);
+    document.documentElement.style.colorScheme = t;
+  } catch (e) {}
+})();
+</script>
+<style>
+  [data-changelog] ul { list-style: disc; padding-left: 1.15rem; }
+  [data-changelog] li::marker { color: rgb(var(--accent)); }
+</style>
+</head>
+
+<body class="antialiased">
+<div class="progress" data-progress role="presentation"></div>
+<a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-4 focus:rounded focus:bg-accent focus:px-4 focus:py-2 focus:text-on-accent">Skip to content</a>
+
+<header data-header class="sticky top-0 z-40 border-b-2 border-line bg-bg/85 backdrop-blur-md">
+  <nav class="shell flex h-[68px] items-center justify-between gap-4" aria-label="Main">
+    <a href="index.html" class="flex items-center gap-3">
+      <span class="brand-tile"><img src="https://raw.githubusercontent.com/MurShidM01/Kern/main/app/src/main/res/drawable-xxxhdpi/ic_launcher_foreground.png" alt="" width="34" height="34" loading="lazy" decoding="async"></span>
+      <span class="font-display text-[19px] font-bold tracking-tight">Kern</span>
+    </a>
+
+    <div class="hidden items-center gap-1 lg:flex">
+      <a href="index.html" class="navlink">Home</a>
+      <a href="index.html#features" class="navlink">Features</a>
+      <a href="index.html#screens" class="navlink">Screens</a>
+      <a href="how-to.html" class="navlink">How to use</a>
+      <a href="docs.html" class="navlink">Docs</a>
+      <a href="changelog.html" class="navlink" aria-current="page">Changelog</a>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <button data-theme-toggle type="button" aria-label="Switch theme" aria-pressed="false"
+        class="inline-flex h-10 w-10 items-center justify-center rounded-lg border-2 border-line bg-surface transition-all hover:-translate-y-0.5">
+        <i data-icon="sun" data-lucide="sun" class="h-[18px] w-[18px]"></i>
+        <i data-icon="moon" data-lucide="moon" class="h-[18px] w-[18px]"></i>
+      </button>
+      <a href="https://github.com/MurShidM01/Kern/releases/tag/v1.0.2%2B261029" target="_blank" rel="noopener" class="hidden sm:inline-flex btn btn--primary btn--sm">
+        <i data-lucide="download"></i>Download
+      </a>
+      <button data-nav-toggle type="button" aria-expanded="false" aria-label="Open the menu"
+        class="inline-flex h-10 w-10 items-center justify-center rounded-lg border-2 border-line bg-surface lg:hidden">
+        <i data-lucide="menu" class="h-[18px] w-[18px]"></i>
+        <i data-lucide="x" class="hidden h-[18px] w-[18px]"></i>
+      </button>
+    </div>
+  </nav>
+
+  <div data-nav-panel class="hidden border-t-2 border-line bg-surface lg:hidden">
+    <div class="shell flex flex-col gap-1 py-4">
+      <a href="index.html" class="navlink navlink--row">Home</a>
+      <a href="index.html#features" class="navlink navlink--row">Features</a>
+      <a href="index.html#screens" class="navlink navlink--row">Screens</a>
+      <a href="how-to.html" class="navlink navlink--row">How to use</a>
+      <a href="docs.html" class="navlink navlink--row">Documentation</a>
+      <a href="changelog.html" class="navlink navlink--row" aria-current="page">Changelog</a>
+      <a href="https://github.com/MurShidM01/Kern/releases/tag/v1.0.2%2B261029" target="_blank" rel="noopener"
+        class="btn btn--primary btn--sm mt-3">Download v1.0.2</a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="relative overflow-hidden border-b-2 border-line">
+  <div class="dots"></div>
+  <span class="orb orb--a"></span>
+  <div class="shell relative py-14 lg:py-20">
+    <span class="badge halo">
+      <span class="badge__dot pulse"></span>
+      v1.0.2 · build 261029
+    </span>
+    <h1 class="mt-5 text-[clamp(30px,5vw,48px)]">Changelog</h1>
+    <p class="lede mt-4 max-w-2xl">
+      Every release, in the order it shipped. Each entry lists what was added, what was fixed and
+      the build number to look for on the release page.
+    </p>
+    <div class="mt-6 flex flex-wrap gap-2">
+      <span class="chip"><i data-lucide="tag"></i>Build number is the release date</span>
+      <span class="chip"><i data-lucide="shield-check"></i>Same signing key every time</span>
+    </div>
+  </div>
+</section>
+
+<section class="shell py-12 lg:py-16">
+  <div class="mx-auto max-w-3xl">
+    <div data-changelog></div>
+    <p class="mt-10 text-[13px] text-muted">
+      Build numbers are dates: <span class="font-mono">261029</span> means 29 October 2026. Because
+      every release is signed with the same key, installing a newer APK keeps your workspaces,
+      sessions and provider profiles.
+    </p>
+  </div>
+</section>
+
+</main>
+
+<footer class="mt-16 border-t-2 border-line bg-bg-alt">
+  <div class="shell flex flex-wrap items-center justify-between gap-3 py-6 text-[13px] text-muted">
+    <p>Copyright <span data-year>2026</span> Ali Khan Jalbani. MIT licensed.</p>
+    <p class="font-mono text-[12px]">
+      <a class="transition-colors hover:text-ink" href="https://github.com/MurShidM01/Kern" target="_blank" rel="noopener">github.com/MurShidM01/Kern</a>
+    </p>
+  </div>
+</footer>
+
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<script src="js/theme.js"></script>
+<script src="js/site.js"></script>
+<script src="js/changelog/v1_0_0.js"></script>
+<script src="js/changelog/v1_0_2.js"></script>
+<script src="js/changelog.js"></script>
+<button type="button" class="totop" data-totop aria-label="Back to top">
+  <i data-lucide="arrow-up"></i>
+</button>
+
+</body>
+</html>
