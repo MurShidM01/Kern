@@ -186,8 +186,10 @@ class PackageManagerViewModel @Inject constructor(
 
     /**
      * Reads the installed set, then every installable package. A fresh Ubuntu image ships without an
-     * apt index, so an empty listing triggers one `apt-get update` and a retry rather than leaving the
-     * screen blank.
+     * apt index, and `apt-cache pkgnames` then answers with the handful of entries it can see
+     * (sometimes just `bash`) instead of nothing — so "empty" is not a reliable signal. Anything
+     * smaller than [MIN_PLAUSIBLE_CATALOG] means the index is missing, and one `apt-get update`
+     * plus a retry is what turns this screen into a real catalogue.
      */
     private suspend fun loadCatalog() {
         val installedOutcome = exec("Reading installed packages…", LIST_INSTALLED, CommandImpact.READ_ONLY)
@@ -200,12 +202,14 @@ class PackageManagerViewModel @Inject constructor(
             maxOutputBytes = LISTING_MAX_BYTES
         )
         var names = parsePackageNames(listing.text)
-        if (names.isEmpty() && !listing.result.timedOut) {
+        if (names.size < MIN_PLAUSIBLE_CATALOG && !listing.result.timedOut) {
             val update = exec(
                 label = "Updating the package index…",
                 command = UPDATE_INDEX,
                 impact = CommandImpact.NETWORK,
-                timeoutMs = CommandRequest.MAX_TIMEOUT_MS
+                // A fresh index is tens of megabytes over a phone connection; the shared two-minute
+                // cap is not enough and used to report a timeout that looked like a broken screen.
+                timeoutMs = PACKAGE_TIMEOUT_MS
             )
             if (update.result.succeeded) {
                 listing = exec(
@@ -314,6 +318,12 @@ class PackageManagerViewModel @Inject constructor(
     private companion object {
         /** `apt-cache pkgnames` lists every package in the index; ~60k names is well past the default cap. */
         const val LISTING_MAX_BYTES = 8 * 1024 * 1024
+
+        /**
+         * A real Ubuntu index has tens of thousands of names. A fresh image answers with a handful,
+         * which used to look like a complete (but tiny) catalogue and left the screen nearly empty.
+         */
+        const val MIN_PLAUSIBLE_CATALOG = 100
     }
 }
 
