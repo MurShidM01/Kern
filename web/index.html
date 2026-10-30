@@ -102,7 +102,7 @@ tailwind.config = {
         <i data-icon="moon" data-lucide="moon" class="h-[18px] w-[18px]"></i>
       </button>
 
-      <a href="https://github.com/MurShidM01/Kern/releases/tag/v1.0.2%2B261029" target="_blank" rel="noopener"
+      <a href="https://github.com/MurShidM01/Kern/releases/tag/v1.0.4%2B261030" target="_blank" rel="noopener"
         class="hidden sm:inline-flex btn btn--primary btn--sm">
         <i data-lucide="download"></i>
         Download
@@ -124,8 +124,8 @@ tailwind.config = {
       <a href="how-to.html" class="navlink navlink--row">How to use</a>
       <a href="docs.html" class="navlink navlink--row">Documentation</a>
       <a href="changelog.html" class="navlink navlink--row">Changelog</a>
-      <a href="https://github.com/MurShidM01/Kern/releases/tag/v1.0.2%2B261029" target="_blank" rel="noopener"
-        class="btn btn--primary btn--sm mt-3">Download v1.0.2</a>
+      <a href="https://github.com/MurShidM01/Kern/releases/tag/v1.0.4%2B261030" target="_blank" rel="noopener"
+        class="btn btn--primary btn--sm mt-3">Download v1.0.4</a>
     </div>
   </div>
 </header>
@@ -141,7 +141,7 @@ tailwind.config = {
     <div>
       <span class="badge halo">
         <span class="badge__dot pulse"></span>
-        v1.0.2 is out
+        v1.0.4 is out
       </span>
 
       <h1 class="mt-6 text-[clamp(34px,6.2vw,62px)]">
@@ -156,7 +156,7 @@ tailwind.config = {
       </p>
 
       <div class="mt-8 flex flex-wrap gap-3">
-        <a href="https://github.com/MurShidM01/Kern/releases/tag/v1.0.2%2B261029" target="_blank" rel="noopener" class="btn btn--primary">
+        <a href="https://github.com/MurShidM01/Kern/releases/tag/v1.0.4%2B261030" target="_blank" rel="noopener" class="btn btn--primary">
           <i data-lucide="download"></i>
           Download for Android
         </a>
@@ -226,41 +226,42 @@ tailwind.config = {
 <section id="whats-new" class="section section--alt">
   <div class="shell">
     <div class="section-head">
-      <p class="label">What's new in v1.0.2</p>
-      <h2>apt installs work again, and the agent stays in its lane.</h2>
+      <p class="label">What's new in v1.0.4</p>
+      <h2>Installs finish, projects are folders, and every change is a diff.</h2>
       <p class="lede">
-        The build that fixed package installation, added an in-app updater and polished the parts of
-        the agent you look at all day.
+        The release that removed the command timeout — and the half-configured packages it left
+        behind — and turned the agent's work into something you can read.
       </p>
     </div>
 
     <div class="grid g-3">
       <article class="card reveal">
-        <div class="card__icon"><i data-lucide="package-check"></i></div>
-        <h3>Packages install properly</h3>
+        <div class="card__icon"><i data-lucide="shield-check"></i></div>
+        <h3>Nothing kills your installs</h3>
         <p>
-          Every file extracted from the rootfs now keeps its real tar permission bits, including
-          hard links. That is what made dpkg-preconfigure and the debconf frontend report
-          Permission denied and left apt half-configured — both are gone.
+          The timeout is gone. apt, npm and a cold build run until they exit instead of being
+          killed at sixty seconds — which is exactly what left dpkg half-configured. Anything slow
+          can also run as a background job while you keep working.
         </p>
       </article>
 
       <article class="card reveal" data-reveal-delay="70">
-        <div class="card__icon"><i data-lucide="refresh-cw"></i></div>
-        <h3>Updates from inside the app</h3>
+        <div class="card__icon"><i data-lucide="folder-tree"></i></div>
+        <h3>Projects are real folders</h3>
         <p>
-          Settings → About Kern checks the latest GitHub release, shows what changed and downloads
-          and installs the new APK without leaving the app.
+          Create a project from Home and it becomes a directory named after itself. Inside the
+          Linux environment they are all siblings under /workspace, so <span class="font-mono">ls
+          /workspace</span> lists the same projects Home does.
         </p>
       </article>
 
       <article class="card reveal" data-reveal-delay="140">
-        <div class="card__icon"><i data-lucide="heart"></i></div>
-        <h3>Small things that add up</h3>
+        <div class="card__icon"><i data-lucide="git-compare"></i></div>
+        <h3>Read the change, not the tool call</h3>
         <p>
-          A themed splash screen, a jump-to-latest arrow while the agent writes, heart-shaped
-          selection handles, shells that end on a $ prompt, and an agent that stays inside the
-          workspace.
+          Every edit shows green added lines and red removed ones — in the approval sheet and in
+          the transcript row. Models are fetched with one tap, and a permission change now applies
+          to the turn that is already running.
         </p>
       </article>
     </div>
@@ -270,9 +271,9 @@ tailwind.config = {
         <i data-lucide="list-checks"></i>
         Read the full changelog
       </a>
-      <a href="https://github.com/MurShidM01/Kern/releases/tag/v1.0.2%2B261029" target="_blank" rel="noopener" class="btn btn--ghost btn--sm">
+      <a href="https://github.com/MurShidM01/Kern/releases/tag/v1.0.4%2B261030" target="_blank" rel="noopener" class="btn btn--ghost btn--sm">
         <i data-lucide="download"></i>
-        Download v1.0.2
+        Download v1.0.4
       </a>
     </div>
   </div>
@@ -684,9 +685,9 @@ tailwind.config = {
         first agent run.
       </p>
       <div class="mt-7 flex flex-wrap justify-center gap-3">
-        <a href="https://github.com/MurShidM01/Kern/releases/tag/v1.0.2%2B261029" target="_blank" rel="noopener" class="btn btn--ghost">
+        <a href="https://github.com/MurShidM01/Kern/releases/tag/v1.0.4%2B261030" target="_blank" rel="noopener" class="btn btn--ghost">
           <i data-lucide="download"></i>
-          Download v1.0.2
+          Download v1.0.4
         </a>
         <a href="how-to.html" class="btn" style="--btn-fg:rgb(var(--on-accent));--btn-bg:transparent;border-color:rgb(var(--on-accent))">
           <i data-lucide="rocket"></i>

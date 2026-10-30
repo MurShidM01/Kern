@@ -139,6 +139,12 @@ __pycache__/
 venv/
 
 # ---------------------------------------------------------------------------
+# Local scratch — device screenshots and patch files used while reviewing a diff
+# ---------------------------------------------------------------------------
+.shots/
+.tmp-patches/
+
+# ---------------------------------------------------------------------------
 # Room exported schemas — MUST be committed (source of truth for migrations)
 # ---------------------------------------------------------------------------
 !core/data/schemas/**
