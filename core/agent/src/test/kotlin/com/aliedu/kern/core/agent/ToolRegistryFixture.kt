@@ -26,6 +26,14 @@ import com.aliedu.kern.core.tools.TerminalStatusTool
 import com.aliedu.kern.core.tools.ToolRegistry
 import com.aliedu.kern.core.tools.UpdateTodosTool
 import com.aliedu.kern.core.tools.WriteFileTool
+import com.aliedu.kern.core.tools.background.BackgroundJob
+import com.aliedu.kern.core.tools.background.BackgroundJobRegistry
+import com.aliedu.kern.core.tools.background.BackgroundOutput
+import com.aliedu.kern.core.tools.background.BackgroundOutputTool
+import com.aliedu.kern.core.tools.background.BackgroundStartTool
+import com.aliedu.kern.core.tools.background.BackgroundStatusTool
+import com.aliedu.kern.core.tools.background.BackgroundStopTool
+import com.aliedu.kern.core.tools.background.BackgroundWaitTool
 import com.aliedu.kern.core.tools.devserver.DevServer
 import com.aliedu.kern.core.tools.devserver.DevServerRegistry
 import com.aliedu.kern.core.tools.devserver.ServerStartTool
@@ -62,6 +70,37 @@ class FakeDevServers : DevServerRegistry {
     override fun isOwned(sessionId: String): Boolean = false
 }
 
+/** No jobs in unit tests; the tools only format what the registry reports. */
+class FakeBackgroundJobs : BackgroundJobRegistry {
+    private val _jobs = MutableStateFlow<List<BackgroundJob>>(emptyList())
+    override val jobs: StateFlow<List<BackgroundJob>> = _jobs
+
+    /** Replace the job list the way the real manager would. */
+    fun setJobs(list: List<BackgroundJob>) {
+        _jobs.value = list
+    }
+
+    override suspend fun start(
+        command: String,
+        workspaceId: String,
+        cwd: String,
+        maxOutputChars: Int
+    ): Result<BackgroundJob> = Result.failure(IllegalStateException("no background jobs in this test"))
+
+    override fun status(id: String): BackgroundJob? = _jobs.value.firstOrNull { it.id == id }
+
+    override fun output(id: String, cursor: Int): BackgroundOutput? {
+        val job = status(id) ?: return null
+        return BackgroundOutput(job.id, job.state, job.output, job.output.length, false, job.output.length)
+    }
+
+    override suspend fun await(id: String, timeoutMs: Long): BackgroundJob? = status(id)
+
+    override suspend fun stop(id: String): Boolean = false
+
+    override fun isOwned(sessionId: String): Boolean = false
+}
+
 /** No terminal in unit tests; the tool only formats what the inspector reports. */
 private object FakeTerminalInspector : TerminalInspector {
     override suspend fun status(workspaceId: String): TerminalStatus =
@@ -81,6 +120,7 @@ private object FakeTerminalInspector : TerminalInspector {
  */
 fun testToolRegistry(diffService: DiffService): ToolRegistry {
     val servers = FakeDevServers()
+    val jobs = FakeBackgroundJobs()
     val preview = PreviewController()
     return ToolRegistry(
         ListFilesTool(), ReadFileTool(), SearchFilesTool(), GlobTool(), GrepTool(),
@@ -92,6 +132,8 @@ fun testToolRegistry(diffService: DiffService): ToolRegistry {
         GitStatusTool(), GitDiffTool(), GitCommitTool(),
         ServerStartTool(), ServerStopTool(servers),
         PreviewOpenTool(preview, servers), PreviewStatusTool(preview, servers),
-        PreviewConsoleTool(preview), PreviewEvalTool(preview), PreviewScreenshotTool(preview)
+        PreviewConsoleTool(preview), PreviewEvalTool(preview), PreviewScreenshotTool(preview),
+        BackgroundStartTool(), BackgroundStatusTool(jobs), BackgroundOutputTool(jobs),
+        BackgroundWaitTool(jobs), BackgroundStopTool(jobs)
     )
 }
