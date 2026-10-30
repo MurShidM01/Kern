@@ -596,7 +596,11 @@ class AgentOrchestrator @Inject constructor(
                                 summary = resultText,
                                 callId = call.id,
                                 linesAdded = selected.totalInsertions,
-                                linesRemoved = selected.totalDeletions
+                                linesRemoved = selected.totalDeletions,
+                                // Only the files that were actually written: a rejected file in a
+                                // multi-file patch must not appear as a change in the transcript.
+                                diff = selected.files.joinToString("\n") { it.unifiedDiff }
+                                    .takeIf { it.isNotBlank() }
                             )
                         )
                     } else {

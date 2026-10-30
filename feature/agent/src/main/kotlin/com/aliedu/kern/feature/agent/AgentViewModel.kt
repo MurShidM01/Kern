@@ -453,7 +453,8 @@ class AgentViewModel @Inject constructor(
                         summary = event.summary,
                         durationMs = started?.let { System.currentTimeMillis() - it },
                         linesAdded = event.linesAdded,
-                        linesRemoved = event.linesRemoved
+                        linesRemoved = event.linesRemoved,
+                        diff = event.diff
                     )
                 }
             }

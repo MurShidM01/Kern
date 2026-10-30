@@ -166,6 +166,11 @@ class AgentOrchestratorTest {
         assertThat(applied.linesAdded).isEqualTo(1)
         assertThat(applied.linesRemoved).isEqualTo(1)
         assertThat(applied.summary).contains("+1 / -1")
+        // The transcript row shows the change itself, so the diff has to reach the UI event too —
+        // the tool-call JSON it used to show is not a reviewable record of what was written.
+        assertThat(applied.diff).isNotNull()
+        assertThat(applied.diff).contains("-old")
+        assertThat(applied.diff).contains("+new")
     }
 
     @Test

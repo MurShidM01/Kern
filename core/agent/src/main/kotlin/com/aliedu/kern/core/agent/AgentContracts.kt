@@ -55,7 +55,12 @@ sealed interface AgentEvent {
         val callId: String? = null,
         /** Line counts for file-editing tools; the transcript shows them as +N / -M. */
         val linesAdded: Int = 0,
-        val linesRemoved: Int = 0
+        val linesRemoved: Int = 0,
+        /**
+         * Unified diff of what the tool actually applied, so the transcript row can show the same
+         * green/red preview the approval sheet showed. Null when nothing was written.
+         */
+        val diff: String? = null
     ) : AgentEvent
 
     data class TodosUpdated(val todos: List<Todo>) : AgentEvent

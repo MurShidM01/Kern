@@ -35,7 +35,7 @@ import com.aliedu.kern.core.data.local.entity.WorkspaceEntity
         LocalPreferenceEntity::class,
         TodoEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 abstract class KernDatabase : RoomDatabase() {
@@ -85,6 +85,16 @@ abstract class KernDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE `tool_events` ADD COLUMN `linesAdded` INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE `tool_events` ADD COLUMN `linesRemoved` INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        /**
+         * v5 keeps the diff a file-editing tool applied, so the transcript can show the change it
+         * made instead of the tool-call JSON. Old rows keep a null diff and fall back to that JSON.
+         */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `tool_events` ADD COLUMN `diff` TEXT")
             }
         }
     }

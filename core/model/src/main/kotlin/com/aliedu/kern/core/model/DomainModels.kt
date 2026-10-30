@@ -125,7 +125,13 @@ data class ToolEvent(
     /** Lines a file-writing tool added; 0 for every tool that does not edit files. */
     val linesAdded: Int = 0,
     /** Lines a file-writing tool removed. */
-    val linesRemoved: Int = 0
+    val linesRemoved: Int = 0,
+    /**
+     * The unified diff a file-writing tool applied, kept so the transcript can show the same
+     * green/red preview the approval sheet showed — the row is the record of the change, and a raw
+     * tool-call JSON is not a reviewable one. Null for every tool that does not edit files.
+     */
+    val diff: String? = null
 )
 
 /** One item in the agent's task list (FR-018). [order] is the display position. */

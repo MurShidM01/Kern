@@ -459,6 +459,12 @@ fun AgentScreen(
 
 private data class Suggestion(val icon: ImageVector, val title: String, val prompt: String)
 
+/**
+ * A file-change row opens its diff by itself up to this many lines. Longer changes stay collapsed:
+ * the row still shows +N / -M, and one tap opens the full preview.
+ */
+private const val DIFF_AUTO_EXPAND_ROWS = 40
+
 private val agentSuggestions = listOf(
     Suggestion(
         icon = KernIcons.Files,
@@ -1849,18 +1855,23 @@ private fun ReasoningRow(text: String, streaming: Boolean) {
 private fun ToolRow(event: ToolEvent, liveOutput: String? = null) {
     val semantic = LocalKernSemanticColors.current
     val isLive = liveOutput != null
-    // null = follow the default (open while a command streams), otherwise the user's choice wins.
+    // null = follow the default (open while a command streams, and for a diff short enough to
+    // read), otherwise the user's choice wins.
     var manual by remember(event.id) { mutableStateOf<Boolean?>(null) }
-    val expanded = manual ?: isLive
+    val diffRows = remember(event.diff) { event.diff?.let { parseUnifiedDiff(it).size } ?: 0 }
+    val autoExpandDiff = diffRows in 1..DIFF_AUTO_EXPAND_ROWS
+    val expanded = manual ?: (isLive || autoExpandDiff)
     val hasDetails = event.argsRedacted.isNotBlank() ||
         !event.resultSummary.isNullOrBlank() ||
-        (liveOutput?.isNotBlank() == true)
+        (liveOutput?.isNotBlank() == true) ||
+        !event.diff.isNullOrBlank()
     val accent = when (event.status) {
         ToolEventStatus.RUNNING -> MaterialTheme.colorScheme.primary
         ToolEventStatus.COMPLETED -> semantic.success
         ToolEventStatus.FAILED -> MaterialTheme.colorScheme.error
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
+    val label = toolStatusLabel(event)
     val scroll = rememberScrollState()
     LaunchedEffect(liveOutput, expanded) {
         if (expanded) scroll.scrollTo(scroll.maxValue)
@@ -1882,7 +1893,7 @@ private fun ToolRow(event: ToolEvent, liveOutput: String? = null) {
                 modifier = Modifier.size(KernSizes.iconSm)
             )
             Text(
-                text = toolStatusLabel(event),
+                text = label,
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
@@ -1950,7 +1961,12 @@ private fun ToolRow(event: ToolEvent, liveOutput: String? = null) {
                 ),
                 verticalArrangement = Arrangement.spacedBy(KernSpacing.xs)
             ) {
-                if (event.argsRedacted.isNotBlank()) {
+                val appliedDiff = event.diff
+                if (!appliedDiff.isNullOrBlank()) {
+                    // The row is the record of the change: show the change itself, not the tool-call
+                    // JSON that asked for it.
+                    DiffPreview(diff = appliedDiff, modifier = Modifier.padding(end = KernSpacing.sm))
+                } else if (event.argsRedacted.isNotBlank()) {
                     Text(
                         text = event.argsRedacted.take(300),
                         style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
@@ -2010,8 +2026,6 @@ private fun ApprovalSheetContent(
     onApprove: (Set<String>) -> Unit,
     onReject: () -> Unit
 ) {
-    val semantic = LocalKernSemanticColors.current
-    var showDiff by remember { mutableStateOf(false) }
     // A multi-file change can be accepted one file at a time; everything starts selected.
     val allPaths = remember(proposal.id) { proposal.files.map { it.path }.toSet() }
     var selected by remember(proposal.id) { mutableStateOf(allPaths) }
@@ -2068,59 +2082,88 @@ private fun ApprovalSheetContent(
         Column(verticalArrangement = Arrangement.spacedBy(KernSpacing.sm)) {
             proposal.files.forEach { file ->
                 val checked = file.path in selected
+                // A single-file change opens its diff straight away: that is the thing being
+                // reviewed. A multi-file patch stays collapsed so the list of files stays readable.
+                var showFileDiff by remember(proposal.id, file.path) {
+                    mutableStateOf(!isMulti)
+                }
                 Surface(
                     shape = KernRadius.smShape,
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     border = BorderStroke(KernElevation.hairline, MaterialTheme.colorScheme.outlineVariant),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .then(
-                            if (isMulti) {
-                                Modifier.clickable {
-                                    selected = if (checked) selected - file.path else selected + file.path
-                                }
-                            } else {
-                                Modifier
-                            }
-                        )
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Row(
-                        modifier = Modifier.padding(KernSpacing.sm),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(KernSpacing.sm)
-                    ) {
-                        if (isMulti) {
-                            Checkbox(
-                                checked = checked,
-                                onCheckedChange = { want ->
-                                    selected = if (want) selected + file.path else selected - file.path
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    if (isMulti) {
+                                        selected = if (checked) selected - file.path
+                                        else selected + file.path
+                                    } else {
+                                        showFileDiff = !showFileDiff
+                                    }
                                 }
+                                .padding(KernSpacing.sm),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(KernSpacing.sm)
+                        ) {
+                            if (isMulti) {
+                                Checkbox(
+                                    checked = checked,
+                                    onCheckedChange = { want ->
+                                        selected = if (want) selected + file.path else selected - file.path
+                                    }
+                                )
+                            }
+                            Icon(
+                                imageVector = if (file.operation == PatchOperation.DELETE) KernIcons.Delete
+                                else KernIcons.File,
+                                contentDescription = null,
+                                tint = if (file.operation == PatchOperation.DELETE)
+                                    MaterialTheme.colorScheme.error
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(KernSizes.iconSm)
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = file.path,
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        fontFamily = FontFamily.Monospace
+                                    ),
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = when {
+                                        file.operation == PatchOperation.DELETE -> "Delete file"
+                                        file.isNewFile -> "New file"
+                                        else -> "Edit file"
+                                    } + "  •  +" + file.insertions + " / -" + file.deletions,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1
+                                )
+                            }
+                            Icon(
+                                imageVector = if (showFileDiff) Icons.Outlined.ExpandLess
+                                else Icons.Outlined.ExpandMore,
+                                contentDescription = if (showFileDiff) "Hide changes" else "Show changes",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .size(KernSizes.iconMd)
+                                    .clickable { showFileDiff = !showFileDiff }
                             )
                         }
-                        Icon(
-                            imageVector = if (file.operation == PatchOperation.DELETE) KernIcons.Delete
-                            else KernIcons.File,
-                            contentDescription = null,
-                            tint = if (file.operation == PatchOperation.DELETE)
-                                MaterialTheme.colorScheme.error
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(KernSizes.iconSm)
-                        )
-                        Text(
-                            text = file.path,
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontFamily = FontFamily.Monospace
-                            ),
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Text(
-                            text = "+${file.insertions} / -${file.deletions}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        if (showFileDiff) {
+                            KernDivider()
+                            DiffPreview(
+                                diff = file.unifiedDiff,
+                                modifier = Modifier.padding(KernSpacing.sm)
+                            )
+                        }
                     }
                 }
             }
@@ -2142,26 +2185,6 @@ private fun ApprovalSheetContent(
             )
         }
 
-        KernOutlinedButton(onClick = { showDiff = !showDiff }, modifier = Modifier.fillMaxWidth()) {
-            Text(if (showDiff) "Hide diff" else "View full diff")
-        }
-        if (showDiff) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(semantic.codeBackground, KernRadius.smShape)
-                    .horizontalScroll(rememberScrollState())
-                    .padding(KernSpacing.sm)
-            ) {
-                proposal.files.forEach { file ->
-                    Text(
-                        text = file.unifiedDiff,
-                        style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
-                        color = semantic.codeText
-                    )
-                }
-            }
-        }
 
         Row(horizontalArrangement = Arrangement.spacedBy(KernSpacing.sm)) {
             KernOutlinedButton(onClick = onReject, modifier = Modifier.weight(1f)) { Text("Reject") }

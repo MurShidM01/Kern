@@ -139,7 +139,9 @@ data class ToolEventEntity(
     val durationMs: Long?,
     val createdAt: Long,
     val linesAdded: Int = 0,
-    val linesRemoved: Int = 0
+    val linesRemoved: Int = 0,
+    /** Unified diff of the change this row applied, for the transcript preview. */
+    val diff: String? = null
 )
 
 /** Agent task-list item (FR-018), persisted per session and replaced wholesale on each update. */
