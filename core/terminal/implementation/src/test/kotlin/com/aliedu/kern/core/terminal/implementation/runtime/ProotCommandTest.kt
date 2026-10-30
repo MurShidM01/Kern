@@ -75,6 +75,28 @@ class ProotCommandTest {
         assertThat(ProotCommand.guestPathFor("/data/data/app/files/execution/abc")).isEqualTo("/workspace")
     }
 
+
+    @Test
+    fun `a project inside the projects root is mapped below workspace`() {
+        // The whole projects root is bound at /workspace, so every project the user created is a
+        // sibling there: /workspace/first_app, /workspace/java_apps, and so on.
+        val root = "/data/data/app/files/workspaces"
+        assertThat(ProotCommand.guestPathFor("$root/first_app", projectsRoot = root))
+            .isEqualTo("/workspace/first_app")
+        assertThat(ProotCommand.guestPathFor(root, projectsRoot = root)).isEqualTo("/workspace")
+        // A path outside the root keeps the old single-workspace fallback.
+        assertThat(ProotCommand.guestPathFor("/data/data/app/files/execution/abc", projectsRoot = root))
+            .isEqualTo("/workspace")
+    }
+
+    @Test
+    fun `bindings mount the projects root, not the project`() {
+        val root = "/data/data/app/files/workspaces"
+        val bindings = ProotCommand.bindings("$root/first_app", projectsRoot = root)
+        assertThat(bindings).contains("$root:/workspace")
+        assertThat(bindings).doesNotContain("$root/first_app:/workspace")
+    }
+
     @Test
     fun `bindings expose primary external storage at sdcard`() {
         val bindings = ProotCommand.bindings("/storage/emulated/0/Kern")

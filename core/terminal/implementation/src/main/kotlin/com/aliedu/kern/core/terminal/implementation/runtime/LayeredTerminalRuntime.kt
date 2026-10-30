@@ -59,6 +59,13 @@ class LayeredTerminalRuntime @Inject constructor(
 
     override suspend fun preferredSessionKind(): SessionKind = preferredKind()
 
+    /**
+     * Delegated to the backend, because only it knows how its guest maps the host filesystem: the
+     * proot guest binds the projects root at `/workspace`, while the device shell needs no mapping.
+     */
+    override suspend fun guestPath(hostPath: String): String? =
+        sessions.guestPath(hostPath, preferredKind())
+
     override suspend fun createSession(workspace: ExecutionWorkspace): TerminalSession =
         sessions.create(workspace, preferredKind())
 

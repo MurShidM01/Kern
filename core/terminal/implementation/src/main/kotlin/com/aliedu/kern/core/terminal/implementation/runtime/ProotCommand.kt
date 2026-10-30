@@ -70,11 +70,19 @@ object ProotCommand {
     fun bindings(
         hostDir: String,
         resolvConf: String? = null,
-        sdcardHost: String = SDCARD_HOST
+        sdcardHost: String = SDCARD_HOST,
+        projectsRoot: String? = null
     ): List<String> {
         val list = SYSTEM_BINDINGS.toMutableList()
         list += "$sdcardHost:$SDCARD_GUEST"
-        if (guestPathFor(hostDir, sdcardHost) == FALLBACK_GUEST) list += "$hostDir:$FALLBACK_GUEST"
+        val guest = guestPathFor(hostDir, sdcardHost, projectsRoot)
+        when {
+            // A project inside the projects root: bind the *root*, not the project, so the guest
+            // sees every project at /workspace and the current one at /workspace/<name>.
+            projectsRoot != null && guest.startsWith(FALLBACK_GUEST + "/") ->
+                list += projectsRoot.trimEnd('/') + ":" + FALLBACK_GUEST
+            guest == FALLBACK_GUEST -> list += "$hostDir:$FALLBACK_GUEST"
+        }
         if (resolvConf != null) list += "$resolvConf:/etc/resolv.conf"
         return list
     }
@@ -82,9 +90,22 @@ object ProotCommand {
     /**
      * The guest path for a host workspace directory. A directory under primary external storage
      * appears at `/sdcard/<relative>`; anything else is bound at [FALLBACK_GUEST].
+     *
+     * When [projectsRoot] is given and the directory is inside it, the path is relative to that
+     * root instead: the root is bound at [FALLBACK_GUEST], so `first_app` under it is
+     * `/workspace/first_app` and `ls /workspace` lists every project.
      */
-    fun guestPathFor(hostDir: String, sdcardHost: String = SDCARD_HOST): String {
+    fun guestPathFor(
+        hostDir: String,
+        sdcardHost: String = SDCARD_HOST,
+        projectsRoot: String? = null
+    ): String {
         val normalized = hostDir.trimEnd('/')
+        if (projectsRoot != null) {
+            val root = projectsRoot.trimEnd('/')
+            if (normalized == root) return FALLBACK_GUEST
+            if (normalized.startsWith("$root/")) return FALLBACK_GUEST + normalized.removePrefix(root)
+        }
         return when {
             normalized == sdcardHost -> SDCARD_GUEST
             normalized.startsWith("$sdcardHost/") -> SDCARD_GUEST + normalized.removePrefix(sdcardHost)

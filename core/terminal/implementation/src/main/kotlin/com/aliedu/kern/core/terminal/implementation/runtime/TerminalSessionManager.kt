@@ -56,6 +56,13 @@ class TerminalSessionManager @Inject constructor(
         return session.toApi()
     }
 
+    /**
+     * How [kind] spells [hostPath] inside its shell, or null when it uses the host path unchanged.
+     * Resolved through the backend so the mapping (the proot bindings) lives in one place.
+     */
+    fun guestPath(hostPath: String, kind: SessionKind): String? =
+        backendsByKind[kind]?.guestPath(hostPath)
+
     fun list(): List<TerminalSession> =
         order.mapNotNull { sessions[it]?.toApi() }
 

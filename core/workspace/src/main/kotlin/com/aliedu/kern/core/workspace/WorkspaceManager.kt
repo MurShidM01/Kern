@@ -28,7 +28,8 @@ class WorkspaceManager @Inject constructor(
     private val storagePermission: StoragePermission
 ) {
 
-    fun appManagedRoot(): File = File(context.filesDir, "workspaces").apply { mkdirs() }
+    /** The projects root: every app-created project is a directory inside it. */
+    fun appManagedRoot(): File = AppWorkspacePaths.root(context.filesDir)
 
     suspend fun openSafWorkspace(treeUri: Uri, displayName: String): Workspace =
         withContext(Dispatchers.IO) {
@@ -57,13 +58,21 @@ class WorkspaceManager @Inject constructor(
             workspace
         }
 
+    /**
+     * Creates a project as a real directory under the projects root, named after the project.
+     *
+     * The directory name is the project name (slugged, with a numeric suffix when taken) rather than
+     * a UUID: the Linux guest binds the whole root at /workspace, so the user gets
+     * /workspace/first_app and can see it in `ls /workspace`, and the name in the shell matches the
+     * name on the Home screen.
+     */
     suspend fun createAppManagedWorkspace(name: String): Workspace = withContext(Dispatchers.IO) {
         val id = UUID.randomUUID().toString()
-        val dir = File(appManagedRoot(), id).apply { mkdirs() }
+        val dir = AppWorkspacePaths.directoryFor(appManagedRoot(), name).apply { mkdirs() }
         val now = System.currentTimeMillis()
         val workspace = Workspace(
             id = id,
-            displayName = name.ifBlank { "New workspace" },
+            displayName = name.ifBlank { dir.name },
             sourceType = WorkspaceSourceType.APP_MANAGED,
             uriString = null,
             localPath = dir.absolutePath,

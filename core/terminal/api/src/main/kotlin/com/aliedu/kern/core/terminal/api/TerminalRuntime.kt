@@ -133,6 +133,18 @@ interface TerminalRuntime {
      */
     suspend fun preferredSessionKind(): SessionKind = SessionKind.DEVICE_SHELL
 
+    /**
+     * The path [hostPath] appears at inside the preferred backend's filesystem, or null when the
+     * host path is already the path that backend sees.
+     *
+     * A proot guest binds the projects root at `/workspace`, so a project inside it is
+     * `/workspace/<name>` and `ls /workspace` lists every project; external storage appears at
+     * `/sdcard/<relative>`. The host spelling does not exist inside the guest, so a `cd` to the host
+     * path fails, the shell keeps whatever directory it was left in, and the next command runs
+     * somewhere else while the caller believes it is in the workspace.
+     */
+    suspend fun guestPath(hostPath: String): String? = null
+
     /** Rename a session for the persistent session UI (PRD 12.4). */
     suspend fun renameSession(sessionId: String, displayName: String) {}
 

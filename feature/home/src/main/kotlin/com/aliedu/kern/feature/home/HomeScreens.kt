@@ -130,11 +130,12 @@ fun rememberStorageAwareFolderPicker(
 @Composable
 fun NameWorkspaceDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
     KernTextInputDialog(
-        title = "New workspace",
-        message = "Files are stored in this app's private storage, shared by every part of Kern.",
+        title = "New project",
+        message = "The project is created as its own folder, named after the name you type. " +
+            "In the terminal it appears at /workspace/<name>, next to your other projects.",
         initialValue = "",
-        label = "Workspace name",
-        placeholder = "My project",
+        label = "Project name",
+        placeholder = "first_app",
         icon = KernIcons.Folder,
         confirmLabel = "Create",
         onDismiss = onDismiss,
@@ -220,17 +221,29 @@ fun HomeScreen(
                     KernRefreshableState {
                         EmptyState(
                             title = "No projects yet",
-                            message = "Open a folder or create an app-managed workspace to get started.",
+                            message = "Create a project, or open a folder you already have.",
                             icon = KernIcons.Folder,
                             action = {
-                                KernButton(onClick = pickFolder) {
+                                KernButton(onClick = { showCreateDialog = true }) {
+                                    Icon(
+                                        imageVector = KernIcons.AddSession,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(KernSizes.iconSm)
+                                    )
+                                    Spacer(Modifier.width(KernSpacing.sm))
+                                    Text("Create a project")
+                                }
+                                KernTextButton(
+                                    onClick = pickFolder,
+                                    modifier = Modifier.padding(top = KernSpacing.xs)
+                                ) {
                                     Icon(
                                         imageVector = Icons.Outlined.FolderOpen,
                                         contentDescription = null,
                                         modifier = Modifier.size(KernSizes.iconSm)
                                     )
-                                    Spacer(Modifier.width(KernSpacing.sm))
-                                    Text("Open folder")
+                                    Spacer(Modifier.width(KernSpacing.xs))
+                                    Text("Open an existing folder")
                                 }
                             }
                         )
@@ -258,7 +271,7 @@ fun HomeScreen(
                         )
                         QuickActionTile(
                             icon = KernIcons.AddSession,
-                            label = "New workspace",
+                            label = "New project",
                             onClick = { showCreateDialog = true },
                             modifier = Modifier.weight(1f)
                         )
@@ -286,7 +299,7 @@ fun HomeScreen(
                     query.isBlank() || it.displayName.contains(query, ignoreCase = true)
                 }
                 if (filtered.isNotEmpty()) {
-                    item { KernSectionLabel("Recent workspaces", modifier = Modifier.padding(top = KernSpacing.xs)) }
+                    item { KernSectionLabel("Projects", modifier = Modifier.padding(top = KernSpacing.xs)) }
                     items(filtered, key = { it.id }) { workspace ->
                         WorkspaceCard(
                             workspace = workspace,

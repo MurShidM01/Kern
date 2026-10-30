@@ -7,6 +7,7 @@ import com.aliedu.kern.core.terminal.api.SessionKind
 import com.aliedu.kern.core.terminal.implementation.install.TerminalInstallStore
 import com.aliedu.kern.core.terminal.implementation.install.TerminalPaths
 import com.aliedu.kern.core.terminal.pty.Pty
+import com.aliedu.kern.core.workspace.AppWorkspacePaths
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -42,6 +43,19 @@ class LinuxProotBackend @Inject constructor(
     override fun isAvailable(): Boolean =
         ProotLauncher.isAvailable(nativeLibraryDir, paths.runtime, paths.rootfs)
 
+    /**
+     * The guest binds the projects root at `/workspace`, so a host path under it is not the path
+     * the shell sees: `cd /data/user/0/<pkg>/files/workspaces/app` fails inside proot and the
+     * command silently runs wherever the shell already was. Answering null for everything else
+     * keeps the caller's host-path fallback honest, because a directory outside every binding is
+     * unreachable in the guest too.
+     */
+    override fun guestPath(hostPath: String): String? {
+        val projectsRoot = AppWorkspacePaths.root(context.filesDir).absolutePath
+        val guest = ProotCommand.guestPathFor(hostPath, projectsRoot = projectsRoot)
+        return guest.takeIf { it != hostPath.trimEnd('/') }
+    }
+
     override suspend fun start(
         workspace: ExecutionWorkspace,
         displayName: String,
@@ -53,12 +67,19 @@ class LinuxProotBackend @Inject constructor(
 
         prepareGuest()
 
-        val guestCwd = ProotCommand.guestPathFor(dir.absolutePath)
+        // App-created projects live under one root that the guest sees as /workspace, so the
+        // session starts in /workspace/<project> and `ls /workspace` lists every project.
+        val projectsRoot = AppWorkspacePaths.root(context.filesDir).absolutePath
+        val guestCwd = ProotCommand.guestPathFor(dir.absolutePath, projectsRoot = projectsRoot)
         val command = ProotCommand.build(
             launcher = proot.absolutePath,
             rootfs = paths.rootfs.absolutePath,
             guestCwd = guestCwd,
-            bindings = ProotCommand.bindings(dir.absolutePath, resolvConf = resolvConfPath()),
+            bindings = ProotCommand.bindings(
+                dir.absolutePath,
+                resolvConf = resolvConfPath(),
+                projectsRoot = projectsRoot
+            ),
             shell = loginShell()
         )
         val env = ProotCommand.environment(
