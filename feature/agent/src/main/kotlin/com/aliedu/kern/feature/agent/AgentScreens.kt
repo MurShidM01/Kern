@@ -1,5 +1,11 @@
 package com.aliedu.kern.feature.agent
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -19,6 +25,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -1704,6 +1711,48 @@ private fun agentPhaseLabel(state: AgentUiState): String = when (state.agentStat
     else -> "Thinking"
 }
 
+/**
+ * Three dots that float up and down, staggered, while the agent is working.
+ *
+ * The old indicator was a spinner next to the word "Thinking…", which claimed the model was
+ * thinking even when it was really waiting on a tool, a retry or the network. Dots say "something is
+ * happening" without claiming what it is; the label beside them says which phase it actually is.
+ */
+@Composable
+private fun FloatingDots(
+    color: Color = MaterialTheme.colorScheme.primary,
+    dotSize: androidx.compose.ui.unit.Dp = 7.dp
+) {
+    val transition = rememberInfiniteTransition(label = "floating-dots")
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        repeat(3) { index ->
+            val lift by transition.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(
+                        durationMillis = 520,
+                        delayMillis = index * 130,
+                        easing = FastOutSlowInEasing
+                    ),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "dot-" + index
+            )
+            Box(
+                modifier = Modifier
+                    .offset(y = (-4f * lift).dp)
+                    .size(dotSize)
+                    .clip(CircleShape)
+                    .background(color.copy(alpha = 0.4f + 0.6f * lift))
+            )
+        }
+    }
+}
+
 /** Minimal "working" indicator shown before the first token arrives, with elapsed seconds. */
 @Composable
 private fun ThinkingRow(label: String, elapsedSeconds: Int) {
@@ -1717,11 +1766,7 @@ private fun ThinkingRow(label: String, elapsedSeconds: Int) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(KernSpacing.sm)
         ) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(KernSizes.iconSm),
-                strokeWidth = 1.5.dp,
-                color = MaterialTheme.colorScheme.primary
-            )
+            FloatingDots()
             Text(
                 text = if (elapsedSeconds > 0) "$label… ${elapsedSeconds}s" else "$label…",
                 style = MaterialTheme.typography.labelMedium,
@@ -1731,18 +1776,26 @@ private fun ThinkingRow(label: String, elapsedSeconds: Int) {
     }
 }
 
+/**
+ * The model's reasoning, as one card: the header *and* the text it describes live inside the same
+ * surface, so the whole reasoning block reads as reasoning rather than a label followed by a stray
+ * paragraph of chat text.
+ */
 @Composable
 private fun ReasoningRow(text: String, streaming: Boolean) {
     var expanded by remember { mutableStateOf(streaming) }
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Surface(
-            onClick = { expanded = !expanded },
-            shape = KernRadius.mdShape,
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            border = BorderStroke(KernElevation.hairline, MaterialTheme.colorScheme.outlineVariant)
-        ) {
+    Surface(
+        shape = KernRadius.mdShape,
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        border = BorderStroke(KernElevation.hairline, MaterialTheme.colorScheme.outlineVariant),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             Row(
-                modifier = Modifier.padding(horizontal = KernSpacing.sm, vertical = KernSpacing.xs),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded }
+                    .padding(horizontal = KernSpacing.sm, vertical = KernSpacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(KernSpacing.xs)
             ) {
@@ -1753,11 +1806,12 @@ private fun ReasoningRow(text: String, streaming: Boolean) {
                     modifier = Modifier.size(KernSizes.iconSm)
                 )
                 Text(
-                    text = if (streaming) "Thinking…" else "Reasoning",
+                    text = "Reasoning",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f)
                 )
+                if (streaming) FloatingDots(dotSize = 5.dp)
                 Icon(
                     imageVector = if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
                     contentDescription = if (expanded) "Collapse reasoning" else "Expand reasoning",
@@ -1765,17 +1819,20 @@ private fun ReasoningRow(text: String, streaming: Boolean) {
                     modifier = Modifier.size(KernSizes.iconMd)
                 )
             }
-        }
-        if (expanded) {
-            Text(
-                text = text.trim(),
-                style = MaterialTheme.typography.bodySmall.copy(
-                    fontFamily = FontFamily.Monospace,
-                    lineHeight = 15.sp
-                ),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = KernSpacing.sm, top = KernSpacing.xs)
-            )
+            if (expanded) {
+                KernDivider()
+                Text(
+                    text = text.trim(),
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = FontFamily.Monospace,
+                        lineHeight = 15.sp
+                    ),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = KernSpacing.sm, vertical = KernSpacing.xs)
+                )
+            }
         }
     }
 }
