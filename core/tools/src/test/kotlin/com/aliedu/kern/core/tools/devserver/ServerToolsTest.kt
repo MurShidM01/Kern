@@ -59,8 +59,6 @@ class ServerToolsTest {
         assertThat(request.port).isEqualTo(8000)
         assertThat(request.command).isEqualTo("python3 -m http.server 8000")
         assertThat(request.reason).isEqualTo("serve the app")
-        // The readiness budget, not a command timeout.
-        assertThat(request.timeoutMs).isEqualTo(CommandRequest.DEV_SERVER_READY_TIMEOUT_MS)
     }
 
     @Test

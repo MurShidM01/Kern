@@ -22,8 +22,12 @@ private fun JsonObject.int(key: String): Int? =
 class RunCommandTool @Inject constructor() : Tool {
     override val name = "run_command"
     override val description =
-        "Propose a shell command to run in the active workspace (built-in shell). The user must " +
-            "approve it before it runs. Use for builds, tests, git, and other CLI tasks."
+        "Propose a shell command to run in the active workspace (built-in shell) and wait for it to " +
+            "exit. The user must approve it before it runs. Use for builds, tests, git, and other " +
+            "quick CLI tasks; use background_start for anything that may take minutes (installs, " +
+            "dependency downloads, cold builds) so you can keep working while it runs. There is no " +
+            "timeout: the command runs until it exits. If it might hang, bound it yourself, e.g. " +
+            "`timeout 300 apt-get install -y …`."
     override val isMutating = false
 
     override fun schema(): ToolSchema = ToolSchema(
@@ -33,7 +37,6 @@ class RunCommandTool @Inject constructor() : Tool {
             {"type":"object","properties":{
               "command":{"type":"string","description":"The shell command to run."},
               "reason":{"type":"string","description":"A short explanation shown to the user."},
-              "timeout_seconds":{"type":"integer","description":"Stop after this many seconds (default 30, max 120)."},
               "output_policy":{"type":"string","enum":["capture","stream"],"description":"capture returns output to you; stream shows it to the user only."}
             },"required":["command"]}
         """.trimIndent()
@@ -45,9 +48,7 @@ class RunCommandTool @Inject constructor() : Tool {
             return ToolResult(false, "", "Missing required argument 'command'.")
         }
         val reason = args.string("reason")
-        val timeoutMs = (args.int("timeout_seconds")?.toLong()?.times(1000))
-            ?.coerceIn(1_000, CommandRequest.MAX_TIMEOUT_MS)
-            ?: CommandRequest.DEFAULT_TIMEOUT_MS
+        val impact = CommandClassifier.classify(command)
         val outputPolicy = if (args.string("output_policy") == "stream") {
             OutputPolicy.STREAM
         } else {
@@ -58,8 +59,7 @@ class RunCommandTool @Inject constructor() : Tool {
             workspaceId = context.workspace.id,
             command = command,
             cwd = context.workspace.localPath.orEmpty(),
-            impact = CommandClassifier.classify(command),
-            timeoutMs = timeoutMs,
+            impact = impact,
             outputPolicy = outputPolicy,
             reason = reason
         )

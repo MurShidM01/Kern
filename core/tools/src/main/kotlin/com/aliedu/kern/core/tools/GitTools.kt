@@ -32,7 +32,6 @@ private fun gitRequest(
     command = command,
     cwd = context.workspace.localPath.orEmpty(),
     impact = impact,
-    timeoutMs = 30_000,
     outputPolicy = OutputPolicy.CAPTURE,
     reason = reason,
     alwaysApprove = alwaysApprove

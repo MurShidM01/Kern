@@ -134,6 +134,18 @@ class ToolArgsTest {
     }
 
     @Test
+    fun `run_command ignores a stale timeout argument`() {
+        // The schema no longer advertises a timeout, so a model that still sends one gets the
+        // command it asked for without a phantom budget attached.
+        val runSchema = RunCommandTool().schema().parametersJsonSchema
+        val normalized = ToolArgs.normalize(
+            Json.parseToJsonElement("""{"command":"make","timeout_seconds":5}""").jsonObject,
+            runSchema
+        )
+        assertThat(normalized["command"]!!.jsonPrimitive.content).isEqualTo("make")
+    }
+
+    @Test
     fun `an empty file is reported as empty rather than as a failed read`() = runBlocking {
         File(root, "blank.txt").writeText("")
         val result = ReadFileTool().execute(args("""{"path":"blank.txt"}"""), context)

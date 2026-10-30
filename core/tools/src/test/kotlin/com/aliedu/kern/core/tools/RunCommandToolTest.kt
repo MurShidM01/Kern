@@ -65,12 +65,6 @@ class RunCommandToolTest {
     }
 
     @Test
-    fun `a timeout argument is honoured and clamped`() = runBlocking {
-        val result = tool.execute(args("command" to "ls", "timeout_seconds" to "5"), context)
-        assertThat(result.commandRequest!!.timeoutMs).isEqualTo(5_000)
-    }
-
-    @Test
     fun `the output policy can be set to stream`() = runBlocking {
         val result = tool.execute(args("command" to "ls", "output_policy" to "stream"), context)
         assertThat(result.commandRequest!!.outputPolicy).isEqualTo(OutputPolicy.STREAM)
@@ -103,6 +97,21 @@ class RunCommandToolTest {
     fun `file writes and git mutations are classified mutating`() {
         listOf("mkdir build", "mv a.txt b.txt", "rm old.txt", "echo hi > out.txt", "git commit -m x").forEach {
             assertThat(CommandClassifier.classify(it)).isEqualTo(CommandImpact.MUTATING)
+        }
+    }
+
+    @Test
+    fun `destructive variants are caught whatever the flag case or spelling`() {
+        // classify() lower-cases the command first, so a pattern written with an upper-case -R
+        // could never match: `chmod -R 777 /` was classified MUTATING and, with the permissive
+        // modes auto-running any non-destructive command, ran without the approval it always needs.
+        listOf(
+            "rm -rf build",
+            "rm --recursive build",
+            "chmod -R 777 /",
+            "chown -R root /tmp/demo"
+        ).forEach { command ->
+            assertThat(CommandClassifier.classify(command)).isEqualTo(CommandImpact.DESTRUCTIVE)
         }
     }
 

@@ -16,14 +16,14 @@ data class CommandRequest(
     /** Absolute execution directory; empty means "resolve from the workspace". */
     val cwd: String = "",
     val impact: CommandImpact,
-    val timeoutMs: Long = DEFAULT_TIMEOUT_MS,
     val outputPolicy: OutputPolicy = OutputPolicy.CAPTURE,
     val reason: String? = null,
     /**
-     * How much output to retain in [CommandResult.output]. Commands that legitimately print a lot
-     * (e.g. listing every apt package) raise this; the default bounds memory for everything else.
+     * How much output to retain in [CommandResult.output], counted in characters (UTF-16 code
+     * units) — not bytes. Commands that legitimately print a lot (e.g. listing every apt package)
+     * raise this; the default bounds memory for everything else.
      */
-    val maxOutputBytes: Int = DEFAULT_MAX_OUTPUT_BYTES,
+    val maxOutputChars: Int = DEFAULT_MAX_OUTPUT_CHARS,
     /**
      * True for build/test/lint runs, whose output is mostly noise. The orchestrator then feeds the
      * model a head/signal/tail summary instead of the raw log (PRD §4.3 bullet 4).
@@ -42,24 +42,31 @@ data class CommandRequest(
      */
     val detach: Boolean = false,
     /** The port a detached server is expected to listen on; null means "discover it". */
-    val port: Int? = null
+    val port: Int? = null,
+
+    /**
+     * Run this as a *finite* background job instead of waiting for it. Unlike [detach], nothing is
+     * expected to open a port: the job is tracked until its command prints an exit status, and its
+     * output, state and exit code stay readable through the `background_*` tools.
+     */
+    val background: Boolean = false
 ) {
     companion object {
-        const val DEFAULT_TIMEOUT_MS: Long = 60_000
+        // There is deliberately no command timeout. Every number we picked was wrong for somebody:
+        // 60 s killed a cold install, 600 s killed a slow one, and either way the executor answered
+        // by SIGKILLing the whole process group — which is what left dpkg half-configured. The
+        // command now runs until it exits, the user stops the turn, or the command itself carries
+        // its own bound (`timeout 300 apt-get install …`), which is the only party that knows how
+        // long this particular work should take.
+        const val DEFAULT_MAX_OUTPUT_CHARS: Int = 64 * 1024
 
-        /**
-         * A Gradle build, an `apt install` or a cold `npm test` on a phone routinely runs past two
-         * minutes. The old 120 s ceiling killed those commands mid-run, the model saw "timed out",
-         * retried, and the task stalled; ten minutes is long enough for real work and still bounds
-         * a hung process.
-         */
-        const val MAX_TIMEOUT_MS: Long = 600_000
-        const val DEFAULT_MAX_OUTPUT_BYTES: Int = 64 * 1024
+        /** Background jobs keep more, because nobody is watching their output live. */
+        const val BACKGROUND_MAX_OUTPUT_CHARS: Int = 128 * 1024
 
         /**
          * How long a detached server may take to accept connections before it is reported as failed.
-         * Deliberately its own budget: a cold `npm run dev` can exceed [DEFAULT_TIMEOUT_MS], and this
-         * is a readiness wait, not a command timeout.
+         * This is a readiness wait, not a command timeout: the server keeps running either way, and
+         * a cold `npm run dev` on a phone can easily take longer than this before it binds.
          */
         const val DEV_SERVER_READY_TIMEOUT_MS: Long = 30_000
     }
@@ -70,21 +77,33 @@ data class CommandResult(
     val exitCode: Int?,
     val output: String,
     val truncated: Boolean = false,
-    val timedOut: Boolean = false,
     val cancelled: Boolean = false,
-    val durationMs: Long = 0
+    val durationMs: Long = 0,
+    /** Set when the command was handed to a background job instead of being awaited. */
+    val jobId: String? = null,
+    /**
+     * True while a background job still runs. A running job has no exit code yet, so [succeeded]
+     * treats "started and still running" as a success of the *start*, never of the command.
+     */
+    val running: Boolean = false
 ) {
-    val succeeded: Boolean get() = exitCode == 0 && !timedOut && !cancelled
+    val succeeded: Boolean get() = !cancelled && (running || exitCode == 0)
 }
 
 /** Runs approved commands in the execution workspace (implemented by the terminal layer). */
 interface CommandExecutor {
     /**
-     * Run [request] to completion and return its bounded output. Cancelling the caller's coroutine
-     * stops the underlying process. [onOutput] receives incremental text when non-null.
+     * Run [request] and return its bounded output. A foreground run waits for the process to exit;
+     * a [CommandRequest.background] run starts a job and returns at once with its id, and a
+     * [CommandRequest.detach] run starts a server and waits only for its port.
+     *
+     * Cancelling the caller's coroutine stops a foreground process. [onOutput] receives incremental
+     * text when non-null.
      */
     suspend fun run(request: CommandRequest, onOutput: ((String) -> Unit)? = null): CommandResult
 }
+
+
 
 /**
  * Classifies a command string by impact using a conservative token/regex heuristic. This is a safety
@@ -92,8 +111,11 @@ interface CommandExecutor {
  */
 object CommandClassifier {
 
+    // Every pattern is written in lower case because [classify] lower-cases the command first. A
+    // literal `-R` here never matched anything: `chmod -R 777 /` was classified MUTATING and, in the
+    // permissive modes, ran without the approval a destructive command always needs.
     private val DESTRUCTIVE = listOf(
-        Regex("""\brm\s+-[a-z]*r"""),                       // rm -r / -rf / -fr
+        Regex("""\brm\s+(-[a-z]*r[a-z]*|--recursive)\b"""), // rm -r / -rf / -fr / --recursive
         Regex("""\brm\s+-[a-z]*f[a-z]*\s+/(\s|$)"""),        // rm -f /
         Regex("""\bsudo\s+rm\b"""),
         Regex("""\bmkfs\b"""),
@@ -101,8 +123,8 @@ object CommandClassifier {
         Regex("""\b(shutdown|reboot|halt|poweroff)\b"""),
         Regex("""\bgit\s+reset\s+--hard\b"""),
         Regex("""\bgit\s+clean\s+-[a-z]*f"""),
-        Regex("""\bchmod\s+-R\s+777\s+/(\s|$)"""),
-        Regex("""\bchown\s+-R\b"""),
+        Regex("""\bchmod\s+(-[a-z]*r[a-z]*|--recursive)\s+777\s+/(\s|$)"""),
+        Regex("""\bchown\s+(-[a-z]*r[a-z]*|--recursive)\b"""),
         Regex("""\btruncate\s+-s\s*0\b"""),
         Regex("""\bkill(all)?\s+-9\b"""),
         Regex("""\b:\(\)\s*\{"""),                           // fork bomb

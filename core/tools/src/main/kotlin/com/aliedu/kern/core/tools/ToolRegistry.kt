@@ -1,6 +1,11 @@
 package com.aliedu.kern.core.tools
 
 import com.aliedu.kern.core.providers.api.ToolSchema
+import com.aliedu.kern.core.tools.background.BackgroundOutputTool
+import com.aliedu.kern.core.tools.background.BackgroundStartTool
+import com.aliedu.kern.core.tools.background.BackgroundStatusTool
+import com.aliedu.kern.core.tools.background.BackgroundStopTool
+import com.aliedu.kern.core.tools.background.BackgroundWaitTool
 import com.aliedu.kern.core.tools.devserver.ServerStartTool
 import com.aliedu.kern.core.tools.devserver.ServerStopTool
 import com.aliedu.kern.core.tools.preview.PreviewConsoleTool
@@ -46,7 +51,12 @@ class ToolRegistry @Inject constructor(
     previewStatusTool: PreviewStatusTool,
     previewConsoleTool: PreviewConsoleTool,
     previewEvalTool: PreviewEvalTool,
-    previewScreenshotTool: PreviewScreenshotTool
+    previewScreenshotTool: PreviewScreenshotTool,
+    backgroundStartTool: BackgroundStartTool,
+    backgroundStatusTool: BackgroundStatusTool,
+    backgroundOutputTool: BackgroundOutputTool,
+    backgroundWaitTool: BackgroundWaitTool,
+    backgroundStopTool: BackgroundStopTool
 ) {
     private val tools: Map<String, Tool> =
         listOf(
@@ -78,7 +88,12 @@ class ToolRegistry @Inject constructor(
             previewStatusTool,
             previewConsoleTool,
             previewEvalTool,
-            previewScreenshotTool
+            previewScreenshotTool,
+            backgroundStartTool,
+            backgroundStatusTool,
+            backgroundOutputTool,
+            backgroundWaitTool,
+            backgroundStopTool
         ).associateBy { it.name }
 
     fun all(): List<Tool> = tools.values.toList()

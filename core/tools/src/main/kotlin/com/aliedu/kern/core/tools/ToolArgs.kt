@@ -76,7 +76,12 @@ object ToolArgs {
             var value = source[name]
             if (value == null || value is JsonNull) {
                 val alias = ALIASES[name].orEmpty().firstOrNull { it in source }
-                if (alias != null) value = source[alias]
+                val found = alias?.let { source[it] }
+                if (found != null) {
+                    // `timeout_ms` is a *millisecond* budget, not a second one. Copying it across
+                    // used to turn 500 ms into 500 s and 60 000 ms into the 600 s cap.
+                    value = if (alias.endsWith("_ms")) millisToSeconds(found) else found
+                }
             }
             if (value == null || value is JsonNull) continue
             out[name] = coerce(value, type, declared)
@@ -86,6 +91,12 @@ object ToolArgs {
             if (name !in out && value !is JsonNull) out[name] = value
         }
         return JsonObject(out)
+    }
+
+    /** Rewrites a millisecond count as whole seconds, never rounding down to zero. */
+    private fun millisToSeconds(value: JsonElement): JsonElement {
+        val millis = (value as? JsonPrimitive)?.intOrNull ?: return value
+        return JsonPrimitive((millis / 1_000).coerceAtLeast(1))
     }
 
     private fun coerce(value: JsonElement, type: String?, spec: JsonObject): JsonElement = when (type) {

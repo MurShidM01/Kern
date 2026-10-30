@@ -83,7 +83,7 @@ fun CommandApprovalSheetContent(
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    "${request.cwd.ifBlank { "workspace root" }}  •  ${request.timeoutMs / 1000}s",
+                    request.cwd.ifBlank { "workspace root" },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -114,7 +114,7 @@ fun CommandApprovalSheetContent(
         ) {
             Column(modifier = Modifier.padding(KernSpacing.md)) {
                 DetailRow("Working directory", request.cwd.ifBlank { "workspace root" })
-                DetailRow("Timeout", "${request.timeoutMs / 1000}s")
+                DetailRow("Timeout", "None — runs until it exits")
                 DetailRow(
                     "Output",
                     if (request.outputPolicy == OutputPolicy.CAPTURE) "Captured and shared with the model"

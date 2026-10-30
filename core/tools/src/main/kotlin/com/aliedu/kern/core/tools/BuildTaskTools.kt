@@ -77,7 +77,7 @@ abstract class TaskCommandTool(
         name = name,
         description = description,
         parametersJsonSchema = """
-            {"type":"object","properties":{"reason":{"type":"string","description":"A short explanation shown to the user."},"timeout_seconds":{"type":"integer","description":"Stop after this many seconds (default 120, max 120)."}},"required":[]}
+            {"type":"object","properties":{"reason":{"type":"string","description":"A short explanation shown to the user."}},"required":[]}
         """.trimIndent()
     )
 
@@ -99,19 +99,14 @@ abstract class TaskCommandTool(
             )
 
         val reason = (args["reason"] as? JsonPrimitive)?.takeIf { it.isString }?.content
-        val timeoutMs = ((args["timeout_seconds"] as? JsonPrimitive)?.intOrNull?.toLong()?.times(1000))
-            ?.coerceIn(5_000, CommandRequest.MAX_TIMEOUT_MS)
-            ?: CommandRequest.MAX_TIMEOUT_MS
-
         val request = CommandRequest(
             workspaceId = context.workspace.id,
             command = command,
             cwd = context.workspace.localPath.orEmpty(),
             impact = CommandClassifier.classify(command),
-            timeoutMs = timeoutMs,
             outputPolicy = OutputPolicy.CAPTURE,
             reason = reason ?: "Run ${kind.name.lowercase()} for this ${type.displayName} project.",
-            maxOutputBytes = TASK_MAX_OUTPUT_BYTES,
+            maxOutputChars = TASK_MAX_OUTPUT_CHARS,
             summarize = true
         )
         return ToolResult(
@@ -123,7 +118,7 @@ abstract class TaskCommandTool(
     }
 
     private companion object {
-        const val TASK_MAX_OUTPUT_BYTES = 256 * 1024
+        const val TASK_MAX_OUTPUT_CHARS = 256 * 1024
     }
 }
 

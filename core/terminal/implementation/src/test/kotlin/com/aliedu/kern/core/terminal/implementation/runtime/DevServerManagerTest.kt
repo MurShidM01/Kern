@@ -14,6 +14,7 @@ import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -35,6 +36,11 @@ class DevServerManagerTest {
         var banner = "Serving HTTP on 0.0.0.0 port 8000\n"
         /** Emit [TerminalOutput.Exited] instead of a banner, to simulate a crash. */
         var exitImmediately: Int? = null
+        /**
+         * Print the server's sentinel with this exit status while the shell stays alive: what a
+         * crashing server actually looks like, since an interactive shell survives its child.
+         */
+        var crashCode: Int? = null
         val stopped = mutableListOf<String>()
         val closed = mutableListOf<String>()
         val renamed = mutableMapOf<String, String>()
@@ -65,12 +71,14 @@ class DevServerManagerTest {
             }
             scope.launch {
                 delay(30)
-                val code = exitImmediately
-                if (code != null) {
-                    flows[sessionId]?.emit(TerminalOutput.Exited(code))
-                } else {
-                    flows[sessionId]?.emit(TerminalOutput.Stdout(banner))
+                flows[sessionId]?.emit(TerminalOutput.Stdout(banner))
+                // The sentinel is what a crash prints when the shell itself keeps running.
+                val marker = Regex("__KERN_SERVER_[a-f0-9]+__").find(text)?.value
+                val crashed = crashCode
+                if (marker != null && crashed != null) {
+                    flows[sessionId]?.emit(TerminalOutput.Stdout("\n" + marker + " " + crashed + "\n"))
                 }
+                exitImmediately?.let { flows[sessionId]?.emit(TerminalOutput.Exited(it)) }
             }
         }
 
@@ -92,12 +100,16 @@ class DevServerManagerTest {
         }
     }
 
-    /** Reports a port open only once [openAfter] probes have happened, to exercise polling. */
-    private class FakeProbe(var open: Boolean = true) : PortProbe {
+    /**
+     * Reports a port open only after [closedProbes] probes, so the pre-flight check sees it closed
+     * and the readiness poll sees it open — the normal case, where *our* server opens the port.
+     */
+    private class FakeProbe(private val closedProbes: Int = 1, var open: Boolean = true) : PortProbe {
         var probes = 0
         override suspend fun isOpen(port: Int): Boolean {
             probes++
-            return open
+            if (!open) return false
+            return probes > closedProbes
         }
     }
 
@@ -191,6 +203,56 @@ class DevServerManagerTest {
         assertThat(runtime.closed).contains("s1")
         assertThat(manager.isOwned("s1")).isFalse()
         assertThat(manager.servers.value.single().state).isEqualTo(DevServerState.STOPPED)
+    }
+
+    @Test
+    fun `a port that is already open is refused before a session is created`(): Unit = runBlocking {
+        // Readiness is "the port accepts connections", which is also true of someone else's
+        // listener. Starting anyway would advertise the wrong URL as this server's.
+        val runtime = FakeRuntime()
+        val manager = DevServerManager(runtime, FakeProbe(closedProbes = 0))
+
+        val result = manager.start("npm run dev", 3000, "ws", "/exec/ws")
+
+        assertThat(result.isFailure).isTrue()
+        assertThat(result.exceptionOrNull()!!.message).contains("already in use")
+        assertThat(runtime.createCalls).isEqualTo(0)
+    }
+
+    @Test
+    fun `a server that dies while the shell survives is reported as failed`(): Unit = runBlocking {
+        // Regression: the watcher only listened for the *shell* exiting, so a crashed server whose
+        // shell stayed alive was registered as RUNNING forever.
+        val runtime = FakeRuntime().apply { crashCode = 127 }
+        val manager = DevServerManager(runtime, FakeProbe(open = false))
+
+        val result = manager.start("node broken.js", 7000, "ws", "/exec/ws")
+
+        assertThat(result.isFailure).isTrue()
+        assertThat(result.exceptionOrNull()!!.message).contains("exited with code 127")
+        assertThat(manager.servers.value.single().state).isEqualTo(DevServerState.FAILED)
+        assertThat(manager.isOwned("s1")).isFalse()
+    }
+
+    @Test
+    fun `cancelling startup closes the session and releases it`(): Unit = runBlocking {
+        // The user closing the sheet mid-start used to leave a live session and an ownership entry
+        // behind, because only the "never became ready" path cleaned up.
+        val runtime = FakeRuntime().apply { banner = "no port here\n" }
+        val manager = DevServerManager(runtime, FakeProbe(open = false))
+        manager.readyTimeoutMs = 10_000
+
+        // Off the runBlocking thread: the assertion below polls with Thread.sleep, which would
+        // otherwise block the only thread this coroutine could run on.
+        val startup = launch(Dispatchers.Default) {
+            runCatching { manager.start("npm run dev", 6000, "ws", "/exec/ws") }
+        }
+        assertThat(waitUntil { runtime.createCalls == 1 }).isTrue()
+        startup.cancelAndJoin()
+
+        assertThat(runtime.closed).contains("s1")
+        assertThat(manager.isOwned("s1")).isFalse()
+        assertThat(manager.servers.value).isEmpty()
     }
 
     @Test

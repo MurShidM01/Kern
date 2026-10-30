@@ -8,7 +8,10 @@ import com.aliedu.kern.core.terminal.api.TerminalSession
 import com.aliedu.kern.core.tools.CommandExecutor
 import com.aliedu.kern.core.tools.CommandRequest
 import com.aliedu.kern.core.tools.CommandResult
+import com.aliedu.kern.core.tools.CappedBuffer
+import com.aliedu.kern.core.tools.OutputPolicy
 import com.aliedu.kern.core.tools.TerminalCommandRecord
+import com.aliedu.kern.core.tools.background.BackgroundJobRegistry
 import com.aliedu.kern.core.tools.devserver.DevServerRegistry
 import com.aliedu.kern.core.workspace.ExecutionWorkspaceResolver
 import kotlinx.coroutines.CancellationException
@@ -19,7 +22,6 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -37,6 +39,7 @@ class TerminalCommandExecutor @Inject constructor(
     private val runtime: TerminalRuntime,
     private val resolver: ExecutionWorkspaceResolver,
     private val devServers: DevServerRegistry,
+    private val backgroundJobs: BackgroundJobRegistry,
     private val tracker: AgentTerminalTracker
 ) : CommandExecutor {
 
@@ -48,6 +51,9 @@ class TerminalCommandExecutor @Inject constructor(
         // time out and then kill it. Detached runs go to the dev-server manager instead, which
         // waits only for the port to accept connections.
         if (request.detach) return runDetached(request, onOutput)
+        // A background job is a *finite* command that outlives the tool call: it is tracked until
+        // its command prints an exit status, so nothing here waits for it or kills it on a timeout.
+        if (request.background) return runInBackground(request)
         return runToCompletion(request, onOutput)
     }
 
@@ -80,6 +86,38 @@ class TerminalCommandExecutor @Inject constructor(
             )
     }
 
+    /**
+     * Hands a finite command to the job manager and returns at once with its id. The job keeps
+     * running after this tool call ends, which is the whole point: an install that needs five
+     * minutes no longer has to fit inside a foreground timeout, and the agent can keep working.
+     */
+    private suspend fun runInBackground(request: CommandRequest): CommandResult {
+        val started = System.currentTimeMillis()
+        val workspace = resolver.prepare(request.workspaceId)
+        val cwd = request.cwd.takeIf { it.isNotBlank() } ?: workspace.workingDirectory
+        return backgroundJobs.start(request.command, request.workspaceId, cwd, request.maxOutputChars)
+            .fold(
+                onSuccess = { job ->
+                    CommandResult(
+                        exitCode = null,
+                        output = "Started background job undefined (undefined). It is still " +
+                            "running; read it with background_output, wait for it with " +
+                            "background_wait, or stop it with background_stop.",
+                        durationMs = System.currentTimeMillis() - started,
+                        jobId = job.id,
+                        running = true
+                    )
+                },
+                onFailure = { error ->
+                    CommandResult(
+                        exitCode = 1,
+                        output = error.message ?: "The background job did not start.",
+                        durationMs = System.currentTimeMillis() - started
+                    )
+                }
+            )
+    }
+
     private suspend fun runToCompletion(
         request: CommandRequest,
         onOutput: ((String) -> Unit)?
@@ -97,12 +135,24 @@ class TerminalCommandExecutor @Inject constructor(
         // /data/user/0/<package>/…, which is not bound inside the rootfs: with `&&` every guest
         // command (apt, dpkg, the package catalogue) died with "No such file or directory" even
         // though the command itself had nothing to do with the workspace.
-        val command = "cd -- " + shellQuote(cwd) + " 2>/dev/null || true; " + request.command
+        //
+        // It must not be silent either. Inside proot the same directory is reachable at a *guest*
+        // path (/sdcard/<rel> or /workspace), so a host path there fails, the shell keeps whatever
+        // directory it was left in, and the command runs in the wrong place while the tracker still
+        // records the workspace root. Ask the runtime for the guest spelling, and say so when even
+        // that does not exist.
+        val guestCwd = runCatching { runtime.guestPath(cwd) }.getOrNull()
+        val command = "cd -- " + shellQuote(guestCwd ?: cwd) + " 2>/dev/null || echo " +
+            shellQuote(CWD_WARNING) + "; " + request.command
 
         val marker = "__KERN_DONE_" + UUID.randomUUID().toString().replace("-", "") + "__"
         val script = command + "\nprintf '\\n" + marker + " %s\\n' \"${'$'}?\"\n"
-        val cap = request.maxOutputBytes
-        val buffer = StringBuilder()
+        // Keeps the head *and* the tail: a failing install prints its error last, and a cap that
+        // only keeps the first N characters hands the model the one part that explains nothing.
+        val buffer = CappedBuffer(request.maxOutputChars)
+        // output_policy = stream means the user watches it and the model does not, so there is
+        // nothing to retain.
+        val capture = request.outputPolicy == OutputPolicy.CAPTURE
         // Compiled once: the collector runs per PTY chunk and a large listing arrives in thousands of
         // chunks, so recompiling the pattern each time measurably throttles the stream.
         val markerPattern = markerRegex(marker)
@@ -114,7 +164,6 @@ class TerminalCommandExecutor @Inject constructor(
         // never see the command text or the sentinel as data.
         val head = StringBuilder()
         var echoPending = true
-        var truncated = false
         val exit = CompletableDeferred<Int>()
         val subscribed = CompletableDeferred<Unit>()
 
@@ -131,15 +180,7 @@ class TerminalCommandExecutor @Inject constructor(
                         }
                     }
                     if (text.isEmpty()) return@collect
-                    if (buffer.length < cap) {
-                        val remaining = cap - buffer.length
-                        if (text.length <= remaining) buffer.append(text) else {
-                            buffer.append(text, 0, remaining)
-                            truncated = true
-                        }
-                    } else {
-                        truncated = true
-                    }
+                    if (capture) buffer.append(text)
 
                     tail.append(text)
                     if (tail.length > MARKER_TAIL) tail.delete(0, tail.length - MARKER_TAIL)
@@ -173,20 +214,18 @@ class TerminalCommandExecutor @Inject constructor(
         subscribed.await()
         runtime.sendInput(session.id, script.toByteArray(Charsets.UTF_8))
 
-        var timedOut = false
+        // No timeout, on purpose: the command runs until it exits. The only thing that ends it early
+        // is the caller being cancelled — the user stopping the turn — and that kills the process
+        // group deliberately. A command that needs a bound carries its own (`timeout 300 …`), which
+        // is the only place that knows how long this particular work should take.
         val exitCode: Int?
         try {
-            exitCode = withTimeoutOrNull(request.timeoutMs) { exit.await() }
+            exitCode = exit.await()
         } catch (cancel: CancellationException) {
             withContext(NonCancellable) { runCatching { runtime.requestStop(session.id) } }
             throw cancel
         } finally {
             collector.cancel()
-        }
-
-        if (exitCode == null) {
-            timedOut = true
-            runCatching { runtime.requestStop(session.id) }
         }
 
         // Remember where the shell ended up and what it ran, so the next command (and the
@@ -211,9 +250,8 @@ class TerminalCommandExecutor @Inject constructor(
 
         CommandResult(
             exitCode = exitCode,
-            output = cleanOutput(buffer.toString(), script, marker),
-            truncated = truncated,
-            timedOut = timedOut,
+            output = cleanOutput(buffer.text(), script, marker),
+            truncated = buffer.truncated,
             durationMs = System.currentTimeMillis() - started
         )
     }
@@ -231,14 +269,19 @@ class TerminalCommandExecutor @Inject constructor(
         val trackedId = tracker.sessionId(workspaceId)
         if (trackedId != null) {
             val tracked = live.firstOrNull { it.id == trackedId }
-            if (tracked != null && tracked.kind == kind && !devServers.isOwned(tracked.id)) {
+            if (tracked != null && tracked.kind == kind &&
+                !devServers.isOwned(tracked.id) && !backgroundJobs.isOwned(tracked.id)
+            ) {
                 return tracked
             }
             tracker.unbind(workspaceId, trackedId)
         }
         // Never reuse a session that belongs to a running server: sending this command to it would
         // both corrupt the server's terminal and, on timeout, kill the server with the process group.
-        val reusable = runtime.findSessionByCwd(cwd, kind)?.takeIf { !devServers.isOwned(it.id) }
+        // Same rule for a background job: its shell is busy running one command, and typing the
+        // next one into it would interleave two outputs and corrupt both.
+        val reusable = runtime.findSessionByCwd(cwd, kind)
+            ?.takeIf { !devServers.isOwned(it.id) && !backgroundJobs.isOwned(it.id) }
         val session = reusable ?: runtime.createSession(ExecutionWorkspace(workspaceId, cwd))
         tracker.bind(workspaceId, session.id, cwd)
         return session
@@ -295,53 +338,16 @@ class TerminalCommandExecutor @Inject constructor(
     }
 
     /** Drops CSI/OSC escape sequences and the carriage returns a pty inserts, leaving plain text. */
-    private fun stripAnsi(text: String): String =
-        text.replace(ANSI_OSC, "")
-            .replace(ANSI_CSI, "")
-            .replace(ANSI_TWO_CHAR, "")
-            .replace("\r", "")
+    private fun stripAnsi(text: String): String = TtyText.stripAnsi(text)
 
-    /**
-     * Index just past the tty's echo of [script] in [text], or -1 if it is not present near the head.
-     * The tty may render `\n` as `\r\n` and wrap long lines, so we match the script character by
-     * character while ignoring carriage returns and newlines.
-     */
-    private fun findEchoEnd(text: String, script: String): Int {
-        val limit = (script.length * 2 + 64).coerceAtMost(text.length)
-        for (start in 0..limit) {
-            var i = start
-            var j = 0
-            while (i < text.length && j < script.length) {
-                val expected = script[j]
-                if (expected == '\n') {
-                    j++
-                    continue
-                }
-                val actual = text[i]
-                if (actual == '\r' || actual == '\n') {
-                    i++
-                    continue
-                }
-                if (actual != expected) break
-                i++
-                j++
-            }
-            if (j == script.length) return i
-        }
-        return -1
-    }
+    /** Index just past the tty's echo of [script] in [text]; see [TtyText.findEchoEnd]. */
+    private fun findEchoEnd(text: String, script: String): Int = TtyText.findEchoEnd(text, script)
 
     private companion object {
         /** How much recent output is kept for sentinel scanning; the sentinel is ~40 chars. */
         const val MARKER_TAIL = 512
 
-        /** OSC: a title or hyperlink, terminated by BEL or ST. */
-        val ANSI_OSC = Regex("\u001B\\][^\u0007\u001B]*(?:\u0007|\u001B\\\\)")
-
-        /** CSI: colours, cursor moves, bracketed-paste markers. */
-        val ANSI_CSI = Regex("\u001B\\[[0-9;?]*[ -/]*[@-~]")
-
-        /** Two-character escapes such as the charset switch. */
-        val ANSI_TWO_CHAR = Regex("\u001B[@-Z\\\\-_]")
+        /** Printed (as output, so the agent sees it) when the workspace directory is unreachable. */
+        const val CWD_WARNING = """[kern] could not enter the workspace directory; running in $(pwd)"""
     }
 }

@@ -137,8 +137,7 @@ class PackageManagerViewModel @Inject constructor(
             val update = exec(
                 label = "Updating the package index…",
                 command = UPDATE_INDEX,
-                impact = CommandImpact.NETWORK,
-                timeoutMs = PACKAGE_TIMEOUT_MS
+                impact = CommandImpact.NETWORK
             )
             if (!update.result.succeeded) {
                 setMessage(failureMessage(update.result))
@@ -148,7 +147,7 @@ class PackageManagerViewModel @Inject constructor(
                 label = "Listing available packages…",
                 command = LIST_AVAILABLE,
                 impact = CommandImpact.READ_ONLY,
-                maxOutputBytes = LISTING_MAX_BYTES
+                maxOutputChars = LISTING_MAX_CHARS
             )
             val names = parsePackageNames(listing.text)
             if (names.isNotEmpty()) catalogStore.putCatalog(names, catalogStore.installed)
@@ -161,8 +160,7 @@ class PackageManagerViewModel @Inject constructor(
             val outcome = exec(
                 label = "Installing " + name + "…",
                 command = "DEBIAN_FRONTEND=noninteractive apt-get install -y " + sanitize(name),
-                impact = CommandImpact.NETWORK,
-                timeoutMs = PACKAGE_TIMEOUT_MS
+                impact = CommandImpact.NETWORK
             )
             if (outcome.result.succeeded) refreshInstalled() else setMessage(failureMessage(outcome.result))
         }
@@ -173,8 +171,7 @@ class PackageManagerViewModel @Inject constructor(
             val outcome = exec(
                 label = "Removing " + name + "…",
                 command = "DEBIAN_FRONTEND=noninteractive apt-get remove -y " + sanitize(name),
-                impact = CommandImpact.MUTATING,
-                timeoutMs = PACKAGE_TIMEOUT_MS
+                impact = CommandImpact.MUTATING
             )
             if (outcome.result.succeeded) refreshInstalled() else setMessage(failureMessage(outcome.result))
         }
@@ -199,24 +196,21 @@ class PackageManagerViewModel @Inject constructor(
             label = "Listing available packages…",
             command = LIST_AVAILABLE,
             impact = CommandImpact.READ_ONLY,
-            maxOutputBytes = LISTING_MAX_BYTES
+            maxOutputChars = LISTING_MAX_CHARS
         )
         var names = parsePackageNames(listing.text)
-        if (names.size < MIN_PLAUSIBLE_CATALOG && !listing.result.timedOut) {
+        if (names.size < MIN_PLAUSIBLE_CATALOG) {
             val update = exec(
                 label = "Updating the package index…",
                 command = UPDATE_INDEX,
-                impact = CommandImpact.NETWORK,
-                // A fresh index is tens of megabytes over a phone connection; the shared two-minute
-                // cap is not enough and used to report a timeout that looked like a broken screen.
-                timeoutMs = PACKAGE_TIMEOUT_MS
+                impact = CommandImpact.NETWORK
             )
             if (update.result.succeeded) {
                 listing = exec(
                     label = "Listing available packages…",
                     command = LIST_AVAILABLE,
                     impact = CommandImpact.READ_ONLY,
-                    maxOutputBytes = LISTING_MAX_BYTES
+                    maxOutputChars = LISTING_MAX_CHARS
                 )
                 names = parsePackageNames(listing.text)
             } else {
@@ -224,7 +218,7 @@ class PackageManagerViewModel @Inject constructor(
             }
         }
         // Never present a silently-truncated catalog as if it were complete.
-        if (listing.result.timedOut) setMessage(failureMessage(listing.result))
+        if (listing.result.truncated) setMessage(failureMessage(listing.result))
         catalogStore.putCatalog(names, installed)
         // A failed listing must not blank a catalog we already have.
         val effective = names.ifEmpty { catalogStore.available }
@@ -262,23 +256,22 @@ class PackageManagerViewModel @Inject constructor(
      *
      * [Outcome.text] is `CommandResult.output`, which the executor cleans of the tty's echo of the
      * command and of the exit sentinel — so the package list is never polluted by shell noise.
-     * [maxOutputBytes] is raised for commands that legitimately print a lot.
+     * [maxOutputChars] is raised for commands that legitimately print a lot.
      *
-     * The timeout is deliberately generous: listing the index prints ~60k names through the PTY and
-     * takes ~10s on a warm shell, more on a cold one. The default 30s cap used to cut it short and
-     * silently yield a partial catalog (which read as "packages are missing").
+     * There is no timeout: an apt transaction finishes when apt says it has finished, and killing it
+     * halfway leaves the package database half-configured. Cancelling the screen (backing out) is
+     * the only thing that stops one.
      */
     private suspend fun exec(
         label: String,
         command: String,
         impact: CommandImpact,
-        timeoutMs: Long = CommandRequest.MAX_TIMEOUT_MS,
-        maxOutputBytes: Int = CommandRequest.DEFAULT_MAX_OUTPUT_BYTES
+        maxOutputChars: Int = CommandRequest.DEFAULT_MAX_OUTPUT_CHARS
     ): Outcome {
         val id = workspaceId
         if (id == null) {
             return Outcome(
-                CommandResult(null, "Open a workspace before managing packages.", timedOut = false),
+                CommandResult(null, "Open a workspace before managing packages."),
                 ""
             )
         }
@@ -290,15 +283,13 @@ class PackageManagerViewModel @Inject constructor(
                     workspaceId = id,
                     command = command,
                     impact = impact,
-                    timeoutMs = timeoutMs,
-                    maxOutputBytes = maxOutputBytes
+                    maxOutputChars = maxOutputChars
                 )
             ) { chunk -> logStore.append(chunk) }
         }.getOrElse { error ->
             CommandResult(
                 exitCode = null,
-                output = error.message ?: "Command failed.",
-                timedOut = false
+                output = error.message ?: "Command failed."
             )
         }
         _state.update { it.copy(busy = false, busyLabel = null) }
@@ -306,7 +297,12 @@ class PackageManagerViewModel @Inject constructor(
     }
 
     private fun failureMessage(result: CommandResult): String = when {
-        result.timedOut -> "The command timed out."
+        // A cancelled apt run may have been interrupted mid-transaction. Say what to do about it
+        // instead of just reporting the cancel, or the next install fails for a different,
+        // invisible reason.
+        result.cancelled -> "The command was cancelled. If it was installing or updating " +
+            "packages, run dpkg --configure -a in the terminal before retrying."
+        result.truncated -> "The package list was too long to read in full and was cut short."
         result.exitCode == null -> "The command could not be run."
         else -> "Command failed (exit ${result.exitCode}). ${result.output.take(200)}".trim()
     }
@@ -317,7 +313,7 @@ class PackageManagerViewModel @Inject constructor(
 
     private companion object {
         /** `apt-cache pkgnames` lists every package in the index; ~60k names is well past the default cap. */
-        const val LISTING_MAX_BYTES = 8 * 1024 * 1024
+        const val LISTING_MAX_CHARS = 8 * 1024 * 1024
 
         /**
          * A real Ubuntu index has tens of thousands of names. A fresh image answers with a handful,
@@ -326,13 +322,6 @@ class PackageManagerViewModel @Inject constructor(
         const val MIN_PLAUSIBLE_CATALOG = 100
     }
 }
-
-/**
- * apt downloads indexes and packages over the device's network, which is far slower than a desktop:
- * `apt-get update` alone pulls tens of megabytes on a fresh image. The shared two-minute cap is not
- * enough, so package operations get their own budget.
- */
-private const val PACKAGE_TIMEOUT_MS = 10 * 60_000L
 
 /** Package commands. Kept together so the UI never builds a shell line itself. */
 private const val UPDATE_INDEX = "apt-get update"

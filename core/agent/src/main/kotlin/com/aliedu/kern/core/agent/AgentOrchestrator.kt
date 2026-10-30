@@ -15,8 +15,11 @@ import com.aliedu.kern.core.providers.api.ToolCall
 import com.aliedu.kern.core.tools.CommandExecutor
 import com.aliedu.kern.core.tools.CommandImpact
 import com.aliedu.kern.core.tools.CommandOutputSummarizer
+import com.aliedu.kern.core.tools.CommandRecovery
 import com.aliedu.kern.core.tools.CommandRequest
 import com.aliedu.kern.core.tools.CommandResult
+import com.aliedu.kern.core.tools.OutputPolicy
+import com.aliedu.kern.core.tools.OutputWindow
 import com.aliedu.kern.core.tools.PatchApplier
 import com.aliedu.kern.core.tools.PatchProposal
 import com.aliedu.kern.core.tools.ToolArgs
@@ -386,15 +389,38 @@ class AgentOrchestrator @Inject constructor(
                         .awaitAll()
                         .toMap()
                 }
+                // Some read-only tools answer by proposing a read-only command instead of running
+                // one: git_status and git_diff do exactly that. Only the gated branch below ever
+                // executed a request, so the model used to receive the proposal text — "Proposed
+                // git status." — and never the repository state it asked for.
+                //
+                // They run here, one at a time: every command shares the workspace's single shell,
+                // so two concurrent runs would interleave their output and corrupt both.
+                val inline = LinkedHashMap<String, Pair<CommandRequest, CommandResult>>()
+                for (call in readOnlyCalls) {
+                    val proposed = computed.getValue(call.id).commandRequest ?: continue
+                    // A tool that declares itself read-only may only propose a read-only command;
+                    // anything else belongs in the approval flow, not here.
+                    if (proposed.impact != CommandImpact.READ_ONLY) continue
+                    val outcome = runCatching { commandExecutor.run(proposed) }.getOrNull() ?: continue
+                    inline[call.id] = proposed to outcome
+                    emit(AgentEvent.CommandCompleted(proposed.command, outcome))
+                }
                 for (call in readOnlyCalls) {
                     val result = computed.getValue(call.id)
                     result.todos?.let { latestTodos = it; emit(AgentEvent.TodosUpdated(it)) }
-                    val text = if (result.success) result.output else (result.errorMessage ?: "Tool failed.")
+                    val executed = inline[call.id]
+                    val success = executed?.second?.succeeded ?: result.success
+                    val text = when {
+                        executed != null -> formatCommandResult(executed.first, executed.second)
+                        result.success -> result.output
+                        else -> result.errorMessage ?: "Tool failed."
+                    }
                     resultsById[call.id] = text
                     emit(
                         AgentEvent.ToolResultEvent(
                             toolName = call.name,
-                            success = result.success,
+                            success = success,
                             summary = text.take(400),
                             callId = call.id,
                             linesAdded = result.linesAdded,
@@ -716,19 +742,46 @@ class AgentOrchestrator @Inject constructor(
     }
 
     private fun formatCommandResult(request: CommandRequest, result: CommandResult): String {
-        val header = when {
-            result.timedOut -> "The command timed out and was stopped."
-            result.cancelled -> "The command was cancelled."
-            else -> "The command exited with code ${result.exitCode}."
+        // A background job has not finished, so it has no exit code to report. Saying "exited with
+        // code null" would invite the model to re-run the command it just started.
+        if (result.running) {
+            return buildString {
+                appendLine(result.output)
+                appendLine()
+                appendLine(
+                    "Keep working on other steps, then call background_wait(id = \"" + result.jobId +
+                        "\") to get the exit code and the end of its output. background_output reads " +
+                        "the output so far, background_status checks whether it is still running, " +
+                        "and background_stop cancels it. Do not start the same command again while " +
+                        "the job runs."
+                )
+            }.trimEnd()
         }
-        // Build/test/lint logs are mostly progress noise; keep the actionable lines instead.
+        // output_policy = "stream" promises the user a live view and the model no copy. The text
+        // was handed over anyway, so the two policies behaved identically.
+        if (request.outputPolicy == OutputPolicy.STREAM) {
+            val header = when {
+                result.cancelled -> "The command was cancelled and killed."
+                else -> "The command exited with code " + result.exitCode + "."
+            }
+            return header + "\n\nIts output was streamed to the user and not captured, so you " +
+                "have not seen it. Re-run with output_policy set to capture if you need the text."
+        }
+        val header = when {
+            result.cancelled -> "The command was cancelled and killed."
+            else -> "The command exited with code " + result.exitCode + "."
+        }
+        // Build/test/lint logs are mostly progress noise; keep the actionable lines instead. Both
+        // paths keep the head *and* the tail: a failing install or build prints its error last, so
+        // cutting to the first N characters handed the model the one part that explains nothing.
         val body = if (request.summarize) {
-            CommandOutputSummarizer.summarize(result.output).take(6_000)
+            OutputWindow.headTail(CommandOutputSummarizer.summarize(result.output), 6_000)
         } else {
-            result.output.take(4_000)
+            OutputWindow.headTail(result.output, 4_000)
         }
         val truncatedNotice = if (result.truncated) "\n[output truncated]" else ""
-        return if (body.isBlank()) "$header$truncatedNotice" else "$header\n$body$truncatedNotice"
+        val text = if (body.isBlank()) header + truncatedNotice else header + "\n" + body + truncatedNotice
+        return if (result.cancelled) text + "\n\n" + CommandRecovery.killedNote(request.command) else text
     }
 
     private fun JsonObject.stringOrNull(key: String): String? =

@@ -57,8 +57,6 @@ class ServerStartTool @Inject constructor() : Tool {
             command = command,
             cwd = context.workspace.localPath.orEmpty(),
             impact = CommandClassifier.classify(command),
-            // The readiness budget, not a command timeout: a cold dev server can take a while to bind.
-            timeoutMs = CommandRequest.DEV_SERVER_READY_TIMEOUT_MS,
             reason = args.string("reason"),
             detach = true,
             port = port

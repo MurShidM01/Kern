@@ -5,6 +5,7 @@ import com.aliedu.kern.core.terminal.implementation.install.DistroCatalogStore
 import com.aliedu.kern.core.terminal.implementation.install.DistroInstaller
 import com.aliedu.kern.core.terminal.implementation.install.EnvironmentInstaller
 import com.aliedu.kern.core.terminal.implementation.install.DistroCatalogProvider
+import com.aliedu.kern.core.terminal.implementation.runtime.BackgroundJobManager
 import com.aliedu.kern.core.terminal.implementation.runtime.DevServerManager
 import com.aliedu.kern.core.terminal.implementation.runtime.LayeredTerminalRuntime
 import com.aliedu.kern.core.terminal.implementation.runtime.PortProbe
@@ -13,6 +14,7 @@ import com.aliedu.kern.core.terminal.implementation.runtime.TerminalCommandExecu
 import com.aliedu.kern.core.terminal.implementation.runtime.TerminalInspectorImpl
 import com.aliedu.kern.core.tools.CommandExecutor
 import com.aliedu.kern.core.tools.TerminalInspector
+import com.aliedu.kern.core.tools.background.BackgroundJobRegistry
 import com.aliedu.kern.core.tools.devserver.DevServerRegistry
 import dagger.Binds
 import dagger.Module
@@ -42,6 +44,10 @@ abstract class TerminalModule {
     @Binds
     @Singleton
     abstract fun bindDevServerRegistry(impl: DevServerManager): DevServerRegistry
+
+    @Binds
+    @Singleton
+    abstract fun bindBackgroundJobRegistry(impl: BackgroundJobManager): BackgroundJobRegistry
 
     @Binds
     @Singleton

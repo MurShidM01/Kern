@@ -68,6 +68,17 @@ class DevServerManager @Inject constructor(
         val id = "srv-" + UUID.randomUUID().toString().replace("-", "").take(8)
         val startedAt = System.currentTimeMillis()
 
+        // An open port is not proof that *our* server is listening, and readiness has nothing else
+        // to go on. Refuse up front instead of advertising someone else's listener as this URL.
+        if (port != null && probe.isOpen(port)) {
+            return Result.failure(
+                IllegalStateException(
+                    "Port " + port + " is already in use. Pick a different port, or stop whatever " +
+                        "is holding it."
+                )
+            )
+        }
+
         val session = try {
             runtime.createSession(ExecutionWorkspace(workspaceId, cwd))
         } catch (e: Exception) {
@@ -86,63 +97,95 @@ class DevServerManager @Inject constructor(
         // reads. Forwarding to the caller stops at readiness so a chatty server cannot grow the
         // orchestrator's buffer.
         val subscribed = CompletableDeferred<Unit>()
-        scope.launch {
+        // A server that crashes returns to the prompt, so an `echo` queued after the command line
+        // reports its exit status. The tty echoes that line too, but with `$?` unexpanded — no
+        // digits — so a numeric match can only be the real status. Watching only the shell's own
+        // exit missed every crash: an interactive shell survives the command inside it dying.
+        val marker = "__KERN_SERVER_" + UUID.randomUUID().toString().replace("-", "").take(12) + "__"
+        val markerPattern = Regex(Regex.escape(marker) + """\s+(-?\d+)""")
+        val tail = StringBuilder()
+        val collector = scope.launch {
             runtime.observeOutput(session.id)
                 .onStart { subscribed.complete(Unit) }
                 .collect { output ->
-                    when (output) {
-                        is TerminalOutput.Stdout -> handleChunk(output.text, log, onOutput, ready, discoveredPort)
-                        is TerminalOutput.Stderr -> handleChunk(output.text, log, onOutput, ready, discoveredPort)
-                        is TerminalOutput.Exited -> exited.compareAndSet(null, output.exitCode)
+                    val text = when (output) {
+                        is TerminalOutput.Stdout -> output.text
+                        is TerminalOutput.Stderr -> output.text
+                        is TerminalOutput.Exited -> {
+                            exited.compareAndSet(null, output.exitCode)
+                            ""
+                        }
+                    }
+                    if (text.isEmpty()) return@collect
+                    handleChunk(text, log, onOutput, ready, discoveredPort)
+                    tail.append(text)
+                    if (tail.length > MARKER_TAIL) tail.delete(0, tail.length - MARKER_TAIL)
+                    markerPattern.find(tail)?.let { match ->
+                        exited.compareAndSet(null, match.groupValues[1].toIntOrNull() ?: -1)
                     }
                 }
         }
 
-        // Subscribe before sending, or a server that prints its banner immediately would have that
-        // output dropped and its port would never be discovered.
-        subscribed.await()
-        runtime.sendInput(session.id, (command + "\n").toByteArray(Charsets.UTF_8))
+        // Cancelling the caller (the user closing the sheet, a turn being stopped) used to leave
+        // the session, its ownership entry and the collector behind: only the "never became ready"
+        // path cleaned up. Everything started here is undone unless the handoff below succeeded.
+        var handedOff = false
+        try {
+            // Subscribe before sending, or a server that prints its banner immediately would have
+            // that output dropped and its port would never be discovered.
+            subscribed.await()
+            val script = command + "\necho \"" + marker + " " + EXIT_STATUS + "\"\n"
+            runtime.sendInput(session.id, script.toByteArray(Charsets.UTF_8))
 
-        val readyPort = awaitReady(port, discoveredPort, exited)
+            val readyPort = awaitReady(port, discoveredPort, exited)
 
-        if (readyPort == null) {
-            runCatching { runtime.closeSession(session.id) }
-            owned.remove(session.id)
-            val reason = exited.get()?.let { code ->
-                "The server exited with code $code before it accepted connections."
-            } ?: "No server accepted connections on port ${port ?: "(unknown)"} within " +
-                "${readyTimeoutMs / 1000}s."
-            upsert(
-                DevServer(
-                    id = id, command = command, port = port, url = null,
-                    state = DevServerState.FAILED, startedAt = startedAt,
-                    sessionId = session.id, log = log.toString()
+            if (readyPort == null) {
+                val reason = exited.get()?.let { code ->
+                    "The server exited with code " + code + " before it accepted connections."
+                } ?: "No server accepted connections on port " + (port ?: "(unknown)") + " within " +
+                    (readyTimeoutMs / 1000) + "s."
+                upsert(
+                    DevServer(
+                        id = id, command = command, port = port, url = null,
+                        state = DevServerState.FAILED, startedAt = startedAt,
+                        sessionId = session.id, log = log.toString()
+                    )
                 )
+                return Result.failure(
+                    IllegalStateException(reason + "\n" + log.toString().takeLast(LOG_REPORT_CHARS))
+                )
+            }
+
+            ready.set(true)
+            val server = DevServer(
+                id = id,
+                command = command,
+                port = readyPort,
+                url = localPreviewUrl(readyPort),
+                state = DevServerState.RUNNING,
+                startedAt = startedAt,
+                sessionId = session.id,
+                log = log.toString()
             )
-            return Result.failure(IllegalStateException("$reason\n${log.toString().takeLast(LOG_REPORT_CHARS)}"))
+            upsert(server)
+            handedOff = true
+
+            // Reflect a later crash: the command printing its sentinel — or the session ending —
+            // means the server is gone.
+            scope.launch {
+                while (exited.get() == null) delay(EXIT_WATCH_MS)
+                owned.remove(session.id)
+                markStopped(id, exited.get())
+            }
+
+            return Result.success(server)
+        } finally {
+            if (!handedOff) {
+                collector.cancel()
+                runCatching { runtime.closeSession(session.id) }
+                owned.remove(session.id)
+            }
         }
-
-        ready.set(true)
-        val server = DevServer(
-            id = id,
-            command = command,
-            port = readyPort,
-            url = localPreviewUrl(readyPort),
-            state = DevServerState.RUNNING,
-            startedAt = startedAt,
-            sessionId = session.id,
-            log = log.toString()
-        )
-        upsert(server)
-
-        // Reflect a later crash: the session ending means the server is gone.
-        scope.launch {
-            while (exited.get() == null) delay(EXIT_WATCH_MS)
-            owned.remove(session.id)
-            markStopped(id, exited.get())
-        }
-
-        return Result.success(server)
     }
 
     override suspend fun stop(id: String): Boolean {
@@ -226,6 +269,12 @@ class DevServerManager @Inject constructor(
 
         /** How often to notice that a running server's session has ended. */
         const val EXIT_WATCH_MS = 1_000L
+
+        /** How much recent output is kept for sentinel scanning; the sentinel is ~50 chars. */
+        const val MARKER_TAIL = 512
+
+        /** Expanded by the shell into the last command's exit status. */
+        const val EXIT_STATUS = "\$?"
 
         /** How much of the startup log to retain for diagnostics. */
         const val MAX_LOG_CHARS = 8_000
