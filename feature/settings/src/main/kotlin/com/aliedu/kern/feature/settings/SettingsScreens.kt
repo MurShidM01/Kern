@@ -1004,12 +1004,16 @@ fun ProviderEditScreen(
     onBack: () -> Unit,
     onDisplayNameChange: (String) -> Unit,
     onBaseUrlChange: (String) -> Unit,
-    onModelIdChange: (String) -> Unit,
     onApiKeyChange: (String) -> Unit,
     onToggleApiKeyVisibility: () -> Unit,
     onProtocolChange: (ProviderProtocol) -> Unit,
     onTest: () -> Unit,
-    onSave: () -> Unit
+    onSave: () -> Unit,
+    onOpenModelPicker: () -> Unit,
+    onCloseModelPicker: () -> Unit,
+    onModelQueryChange: (String) -> Unit,
+    onSelectModel: (String) -> Unit,
+    onRefreshModels: () -> Unit
 ) {
     LaunchedEffect(profileId) { onLoad(profileId) }
     var protocolMenu by remember { mutableStateOf(false) }
@@ -1113,17 +1117,6 @@ fun ProviderEditScreen(
                         supportingText = state.fieldErrors["baseUrl"],
                         modifier = Modifier.fillMaxWidth()
                     )
-
-                    KernTextField(
-                        value = state.modelId,
-                        onValueChange = onModelIdChange,
-                        label = "Model ID",
-                        placeholder = "model-id",
-                        leadingIcon = KernIcons.Agent,
-                        isError = state.fieldErrors.containsKey("modelId"),
-                        supportingText = state.fieldErrors["modelId"],
-                        modifier = Modifier.fillMaxWidth()
-                    )
                 }
             }
 
@@ -1154,6 +1147,70 @@ fun ProviderEditScreen(
                         },
                         modifier = Modifier.fillMaxWidth()
                     )
+                }
+            }
+
+            KernSettingsGroup(
+                title = "Model",
+                footer = "Tap the field to load every model this endpoint offers. You can also type an id yourself."
+            ) {
+                Column(
+                    modifier = Modifier.padding(KernSpacing.md),
+                    verticalArrangement = Arrangement.spacedBy(KernSpacing.xs)
+                ) {
+                    Surface(
+                        onClick = onOpenModelPicker,
+                        shape = KernRadius.mdShape,
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(KernSpacing.md),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(KernSpacing.sm)
+                        ) {
+                            Icon(
+                                imageVector = KernIcons.Agent,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(KernSizes.iconMd)
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "Model ID",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    state.modelId.ifBlank { "Choose or type a model" },
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontFamily = FontFamily.Monospace
+                                    ),
+                                    color = if (state.modelId.isBlank()) {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface
+                                    },
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            Icon(
+                                Icons.Outlined.ArrowDropDown,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(KernSizes.iconMd)
+                            )
+                        }
+                    }
+                    state.fieldErrors["modelId"]?.let { error ->
+                        Text(
+                            text = error,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
                 }
             }
 
@@ -1202,6 +1259,217 @@ fun ProviderEditScreen(
                     )
                     Spacer(Modifier.width(KernSpacing.xs))
                     Text(if (state.saving) "Saving…" else "Save profile")
+                }
+            }
+        }
+    }
+
+    if (state.modelPickerOpen) {
+        ModelPickerSheet(
+            state = state,
+            onDismiss = onCloseModelPicker,
+            onQueryChange = onModelQueryChange,
+            onSelect = onSelectModel,
+            onRefresh = onRefreshModels
+        )
+    }
+}
+
+/**
+ * Model picker for a provider that may not be saved yet: it fetches `GET {BASE_URL}/models` with
+ * the base URL and key currently in the form, filters the list as the user types (the same way the
+ * composer filters models), and offers the typed text as a manual id for endpoints that do not
+ * list it.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ModelPickerSheet(
+    state: ProviderEditUiState,
+    onDismiss: () -> Unit,
+    onQueryChange: (String) -> Unit,
+    onSelect: (String) -> Unit,
+    onRefresh: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+        tonalElevation = 0.dp,
+        dragHandle = null
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = KernSpacing.md)
+                .padding(bottom = KernSpacing.lg),
+            verticalArrangement = Arrangement.spacedBy(KernSpacing.sm)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(KernSpacing.sm)
+            ) {
+                KernIconBadge(icon = KernIcons.Agent, size = 36.dp, iconSize = KernSizes.iconSm)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Model",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = when {
+                            state.modelsLoading -> "Fetching models…"
+                            state.models.isNotEmpty() -> state.visibleModels.size.toString() +
+                                " of " + state.models.size + " model(s)"
+                            else -> state.baseUrl.ifBlank { "No base URL yet" }
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                KernTextButton(onClick = onRefresh) {
+                    Text("Refresh", style = MaterialTheme.typography.labelSmall)
+                }
+            }
+
+            KernTextField(
+                value = state.modelQuery,
+                onValueChange = onQueryChange,
+                placeholder = "Search models, or type an id",
+                leadingIcon = KernIcons.Search,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            when {
+                state.modelsLoading -> Row(
+                    modifier = Modifier.padding(vertical = KernSpacing.lg),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(KernSpacing.sm)
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(KernSizes.iconMd),
+                        strokeWidth = 1.5.dp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        "Loading models from the provider…",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                state.modelsError != null -> KernStatusCard(
+                    title = "Could not load models",
+                    detail = state.modelsError,
+                    tone = KernTone.ERROR
+                )
+
+                state.visibleModels.isEmpty() -> KernInfoNote(
+                    text = if (state.models.isEmpty()) {
+                        "This endpoint reported no models. Type the id above and tap \"Use this id\"."
+                    } else {
+                        "No model matches your search. Type the full id and tap \"Use this id\"."
+                    },
+                    modifier = Modifier.padding(vertical = KernSpacing.md)
+                )
+
+                else -> LazyColumn(
+                    modifier = Modifier.heightIn(max = 380.dp),
+                    verticalArrangement = Arrangement.spacedBy(KernSpacing.xs)
+                ) {
+                    items(state.visibleModels, key = { it.id }) { model ->
+                        val current = model.id == state.modelId
+                        Surface(
+                            onClick = { onSelect(model.id) },
+                            shape = KernRadius.mdShape,
+                            color = if (current) MaterialTheme.colorScheme.primaryContainer
+                            else MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(
+                                KernElevation.hairline,
+                                if (current) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.outlineVariant
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(
+                                    horizontal = KernSpacing.md,
+                                    vertical = KernSpacing.sm
+                                ),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(KernSpacing.sm)
+                            ) {
+                                Text(
+                                    text = model.id,
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontFamily = FontFamily.Monospace
+                                    ),
+                                    color = if (current) MaterialTheme.colorScheme.onPrimaryContainer
+                                    else MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                if (current) {
+                                    Icon(
+                                        imageVector = KernIcons.Check,
+                                        contentDescription = "Current model",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(KernSizes.iconMd)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Manual entry: whatever is typed can be used as-is, for endpoints that do not list
+            // their models or for a fine-tune that only exists by name.
+            if (state.modelQuery.isNotBlank()) {
+                Surface(
+                    onClick = { onSelect(state.modelQuery) },
+                    shape = KernRadius.mdShape,
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    border = BorderStroke(
+                        KernElevation.hairline,
+                        MaterialTheme.colorScheme.outlineVariant
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(
+                            horizontal = KernSpacing.md,
+                            vertical = KernSpacing.sm
+                        ),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(KernSpacing.sm)
+                    ) {
+                        Icon(
+                            imageVector = KernIcons.Check,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(KernSizes.iconMd)
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Use this id",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                state.modelQuery.trim(),
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontFamily = FontFamily.Monospace
+                                ),
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
                 }
             }
         }

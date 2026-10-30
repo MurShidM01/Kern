@@ -367,9 +367,28 @@ data class ProviderEditUiState(
     val testMessage: String? = null,
     val testSuccess: Boolean? = null,
     val fieldErrors: Map<String, String> = emptyMap(),
-    val saved: Boolean = false
+    val saved: Boolean = false,
+    // ---- model picker --------------------------------------------------------------------
+    /** True while the model sheet is open. */
+    val modelPickerOpen: Boolean = false,
+    val modelsLoading: Boolean = false,
+    val models: List<ModelInfo> = emptyList(),
+    val modelsError: String? = null,
+    /** Search box in the model sheet; also the value the manual "use this" row offers. */
+    val modelQuery: String = ""
 ) {
     val isNew: Boolean get() = profileId == null
+
+    /** [models] narrowed by [modelQuery], the same way the composer filters its list. */
+    val visibleModels: List<ModelInfo>
+        get() {
+            val term = modelQuery.trim()
+            if (term.isEmpty()) return models
+            return models.filter {
+                it.id.contains(term, ignoreCase = true) ||
+                    it.ownedBy?.contains(term, ignoreCase = true) == true
+            }
+        }
 }
 
 @HiltViewModel
@@ -403,10 +422,90 @@ class ProviderEditViewModel @Inject constructor(
 
     fun onDisplayNameChange(v: String) = update { copy(displayName = v) }
     fun onBaseUrlChange(v: String) = update { copy(baseUrl = v) }
-    fun onModelIdChange(v: String) = update { copy(modelId = v) }
     fun onApiKeyChange(v: String) = update { copy(apiKeyInput = v) }
     fun toggleApiKeyVisibility() = update { copy(showApiKey = !showApiKey) }
     fun onProtocolChange(p: ProviderProtocol) = update { copy(protocol = p) }
+    // ---- model picker ----------------------------------------------------------------------
+
+    /**
+     * Opens the model sheet and fetches `GET {BASE_URL}/models` with the values typed so far, so the
+     * user can pick a real model id instead of typing one from memory. A blank base URL is reported
+     * in the sheet rather than as a network error.
+     */
+    fun openModelPicker() {
+        update { copy(modelPickerOpen = true, modelsError = null) }
+        refreshModels()
+    }
+
+    fun closeModelPicker() = update { copy(modelPickerOpen = false) }
+
+    fun onModelQueryChange(v: String) = update { copy(modelQuery = v) }
+
+    /** Makes [modelId] this profile's model. Used by both the list and the manual row. */
+    fun selectModel(modelId: String) = update {
+        copy(
+            modelId = modelId.trim(),
+            modelPickerOpen = false,
+            modelQuery = "",
+            fieldErrors = fieldErrors - "modelId"
+        )
+    }
+
+    /** Re-fetches the catalogue for the values currently in the form. */
+    fun refreshModels() {
+        val snapshot = _state.value
+        if (snapshot.baseUrl.isBlank()) {
+            update { copy(modelsLoading = false, models = emptyList(), modelsError = "Enter a base URL first.") }
+            return
+        }
+        viewModelScope.launch {
+            update { copy(modelsLoading = true, modelsError = null) }
+            val key = snapshot.apiKeyInput.ifBlank {
+                snapshot.profileId?.let { credentialStore.getApiKey(it) }
+            }
+            providerAdapter.listModels(probeProfile(snapshot), key).fold(
+                onSuccess = { list ->
+                    update {
+                        copy(
+                            modelsLoading = false,
+                            models = list.sortedBy { it.id },
+                            modelsError = if (list.isEmpty()) "The endpoint returned no models." else null
+                        )
+                    }
+                },
+                onFailure = { t ->
+                    update {
+                        copy(
+                            modelsLoading = false,
+                            models = emptyList(),
+                            modelsError = providerAdapter.normalizeError(t).userMessage
+                        )
+                    }
+                }
+            )
+        }
+    }
+
+    /**
+     * The profile a probe is sent as. The base URL and model id are trimmed exactly as [save] does:
+     * otherwise a pasted trailing space makes Test (and the model list) fail against an endpoint the
+     * saved profile would reach fine.
+     */
+    private fun probeProfile(s: ProviderEditUiState) = ProviderProfile(
+        id = s.profileId ?: "probe",
+        displayName = s.displayName,
+        protocol = s.protocol,
+        baseUrl = s.baseUrl.trim(),
+        modelId = s.modelId.trim(),
+        credentialRef = null,
+        customHeaders = emptyMap(),
+        isDefault = false,
+        connectTimeoutMs = 15_000,
+        readTimeoutMs = 60_000,
+        capabilities = ProviderCapabilities(),
+        createdAt = 0,
+        updatedAt = 0
+    )
 
     private fun update(block: ProviderEditUiState.() -> ProviderEditUiState) {
         _state.value = _state.value.block()
@@ -434,24 +533,7 @@ class ProviderEditViewModel @Inject constructor(
             update { copy(testing = true, testMessage = null, testSuccess = null, fieldErrors = emptyMap()) }
             val s = _state.value
             val key = s.apiKeyInput.ifBlank { s.profileId?.let { credentialStore.getApiKey(it) } }
-            val probe = ProviderProfile(
-                id = s.profileId ?: "probe",
-                displayName = s.displayName,
-                protocol = s.protocol,
-                // Trim exactly as [save] does: otherwise a pasted trailing space makes Test fail
-                // against an endpoint the saved profile would reach fine.
-                baseUrl = s.baseUrl.trim(),
-                modelId = s.modelId.trim(),
-                credentialRef = null,
-                customHeaders = emptyMap(),
-                isDefault = false,
-                connectTimeoutMs = 15_000,
-                readTimeoutMs = 60_000,
-                capabilities = ProviderCapabilities(),
-                createdAt = 0,
-                updatedAt = 0
-            )
-            val result = providerAdapter.testConnection(probe, key)
+            val result = providerAdapter.testConnection(probeProfile(s), key)
             update {
                 copy(
                     testing = false,

@@ -457,12 +457,16 @@ fun KernApp(
                             onBack = { navController.popBackStack() },
                             onDisplayNameChange = providerViewModel::onDisplayNameChange,
                             onBaseUrlChange = providerViewModel::onBaseUrlChange,
-                            onModelIdChange = providerViewModel::onModelIdChange,
                             onApiKeyChange = providerViewModel::onApiKeyChange,
                             onToggleApiKeyVisibility = providerViewModel::toggleApiKeyVisibility,
                             onProtocolChange = providerViewModel::onProtocolChange,
                             onTest = providerViewModel::testConnection,
-                            onSave = providerViewModel::save
+                            onSave = providerViewModel::save,
+                            onOpenModelPicker = providerViewModel::openModelPicker,
+                            onCloseModelPicker = providerViewModel::closeModelPicker,
+                            onModelQueryChange = providerViewModel::onModelQueryChange,
+                            onSelectModel = providerViewModel::selectModel,
+                            onRefreshModels = providerViewModel::refreshModels
                         )
                     }
                 }
