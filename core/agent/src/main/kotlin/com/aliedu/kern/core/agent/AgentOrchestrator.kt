@@ -504,10 +504,9 @@ class AgentOrchestrator @Inject constructor(
                 if (result.requiresApproval && commandRequest != null) {
                     // Commands: ASK_CHANGES always prompts; permissive modes auto-run, EXCEPT that a
                     // DESTRUCTIVE command (or one flagged alwaysApprove, e.g. a Git commit) never runs
-                    // without explicit approval (PRD FR-017).
-                    val autoApprove = !commandRequest.alwaysApprove &&
-                        request.permissionMode != PermissionMode.ASK_CHANGES &&
-                        commandRequest.impact != CommandImpact.DESTRUCTIVE
+                    // without explicit approval (PRD FR-017), and AUTO_EDIT only covers *file*
+                    // edits — see [commandNeedsApproval].
+                    val autoApprove = !commandNeedsApproval(commandRequest, request.currentPermissionMode())
                     if (!autoApprove) {
                         emit(AgentEvent.State(AgentState.WAITING_FOR_APPROVAL, call.name))
                         emit(
@@ -557,7 +556,7 @@ class AgentOrchestrator @Inject constructor(
                 } else if (result.requiresApproval && proposal != null) {
                     // AUTO_EDIT / FULL_ACCESS apply file edits without waiting for the user; ASK_CHANGES
                     // pauses and emits an ApprovalRequired event for the UI to resolve.
-                    val autoApprove = request.permissionMode != PermissionMode.ASK_CHANGES
+                    val autoApprove = request.currentPermissionMode() != PermissionMode.ASK_CHANGES
                     if (!autoApprove) {
                         emit(AgentEvent.State(AgentState.WAITING_FOR_APPROVAL, call.name))
                         emit(AgentEvent.ApprovalRequired(proposal, args.stringOrNull("reason")))
@@ -739,6 +738,29 @@ class AgentOrchestrator @Inject constructor(
         } finally {
             pendingPlans.remove(sessionId)
         }
+    }
+
+
+    /**
+     * Whether [request] must wait for the user before it runs.
+     *
+     * AUTO_EDIT is described as "apply file edits automatically; ask for anything else", but the
+     * gate only looked at the impact, so a MUTATING or NETWORK command (`npm install`, `git commit`
+     * without alwaysApprove, a formatter) ran unprompted in that mode. A shell command is always
+     * "anything else"; only FULL_ACCESS runs one without asking.
+     */
+    /**
+     * The mode to obey *right now*. A live provider wins over the snapshot the turn started with, so
+     * a mode change made while the turn is running applies to the tools it has not reached yet.
+     */
+    private fun TurnRequest.currentPermissionMode(): PermissionMode =
+        livePermissionMode?.invoke() ?: permissionMode
+
+    private fun commandNeedsApproval(request: CommandRequest, mode: PermissionMode): Boolean = when {
+        request.alwaysApprove -> true
+        request.impact == CommandImpact.DESTRUCTIVE -> true
+        mode == PermissionMode.FULL_ACCESS -> false
+        else -> true
     }
 
     private fun formatCommandResult(request: CommandRequest, result: CommandResult): String {

@@ -28,6 +28,7 @@ import com.aliedu.kern.core.model.ToolEventStatus
 import com.aliedu.kern.core.model.Workspace
 import com.aliedu.kern.core.providers.api.AiProviderAdapter
 import com.aliedu.kern.core.providers.api.ConnectionResult
+import com.aliedu.kern.core.tools.CommandImpact
 import com.aliedu.kern.core.tools.CommandRequest
 import com.aliedu.kern.core.tools.PatchProposal
 import com.aliedu.kern.core.tools.PlanProposal
@@ -323,6 +324,9 @@ class AgentViewModel @Inject constructor(
                     history = history,
                     userInput = input,
                     permissionMode = _state.value.permissionMode,
+                    // Re-read at every gate: switching to Full Access mid-turn must free the tools
+                    // this turn has not reached yet, not just the next chat.
+                    livePermissionMode = { _state.value.permissionMode },
                     todos = _state.value.todos,
                     memoryEnabled = memoryEnabled
                 )
@@ -681,6 +685,18 @@ class AgentViewModel @Inject constructor(
     fun setPermissionMode(mode: PermissionMode) {
         _state.value = _state.value.copy(permissionMode = mode)
         viewModelScope.launch { settingsRepository.setPermissionMode(mode) }
+        // A request that is *already* waiting would otherwise sit there under the old mode: the
+        // running turn now reads the live mode, but it cannot re-decide a gate it already opened.
+        // Destructive commands keep their gate in every mode (PRD FR-017), so they are not released.
+        val proposal = _state.value.pendingApproval
+        val command = _state.value.pendingCommand
+        val releasable = when (mode) {
+            PermissionMode.FULL_ACCESS -> proposal != null ||
+                (command != null && !command.alwaysApprove && command.impact != CommandImpact.DESTRUCTIVE)
+            PermissionMode.AUTO_EDIT -> proposal != null
+            PermissionMode.ASK_CHANGES -> false
+        }
+        if (releasable) approvePendingChange()
     }
 
     /** Enables/disables showing the model's reasoning (chain of thought) for this and future turns. */

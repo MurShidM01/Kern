@@ -99,6 +99,12 @@ data class TurnRequest(
     val userInput: String,
     val permissionMode: PermissionMode = PermissionMode.ASK_CHANGES,
     /**
+     * Consulted at every approval decision instead of the [permissionMode] snapshot. A turn can run
+     * for minutes, and the user may switch to Full Access while it waits on a tool: without this the
+     * new mode only took effect in the *next* chat, which is exactly what it felt like.
+     */
+    val livePermissionMode: (() -> PermissionMode)? = null,
+    /**
      * Optional ceiling on model turns per user message. `null` (the default) means no ceiling: the
      * loop ends when the model stops asking for tools, the way Claude Code and opencode behave. Set
      * it only to bound a deliberately long run.
