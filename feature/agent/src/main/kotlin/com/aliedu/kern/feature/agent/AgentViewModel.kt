@@ -235,6 +235,9 @@ class AgentViewModel @Inject constructor(
             return
         }
 
+        // Claim a generation before the job starts: a turn that is stopped mid-flight must not
+        // be able to write over the state of the turn that replaces it.
+        val generation = ++sessionStore.turnGeneration
         turnJob = sessionStore.scope.launch {
             val sessionId = ensureSession(workspace, profile, input)
             val history = messageRepository.let { repo ->
@@ -256,7 +259,7 @@ class AgentViewModel @Inject constructor(
             )
             sessionRepository.updateStatus(sessionId, SessionStatus.ACTIVE, System.currentTimeMillis())
 
-            runTurn(sessionId, workspace, profile, input, history)
+            runTurn(sessionId, workspace, profile, input, history, generation)
         }
     }
 
@@ -279,10 +282,11 @@ class AgentViewModel @Inject constructor(
         // History before the request being retried; the failed/cancelled reply is dropped.
         val history = messages.take(lastUserIndex)
 
+        val generation = ++sessionStore.turnGeneration
         turnJob = sessionStore.scope.launch {
             sessionRepository.updateStatus(sessionId, SessionStatus.ACTIVE, System.currentTimeMillis())
             _state.value = _state.value.copy(canRetry = false, error = null)
-            runTurn(sessionId, workspace, profile, input, history)
+            runTurn(sessionId, workspace, profile, input, history, generation)
         }
     }
 
@@ -292,7 +296,8 @@ class AgentViewModel @Inject constructor(
         workspace: Workspace,
         profile: ProviderProfile,
         input: String,
-        history: List<Message>
+        history: List<Message>,
+        generation: Long
     ) {
         val wsAdapter = adapter ?: return
         val apiKey = credentialStore.getApiKey(profile.id)
@@ -330,7 +335,7 @@ class AgentViewModel @Inject constructor(
                     todos = _state.value.todos,
                     memoryEnabled = memoryEnabled
                 )
-            ).collect { event -> handleEvent(sessionId, event, partial, lastReply) }
+            ).collect { event -> handleEvent(sessionId, event, partial, lastReply, generation) }
             // The turn ran to completion (not cancelled, not failed): the user may have left the
             // screen while it worked, so tell them it is done. Never let a notification failure
             // turn a finished turn into a failed one.
@@ -346,15 +351,17 @@ class AgentViewModel @Inject constructor(
             // on persistence. Persistence runs in a NonCancellable block.
             // Stop is a user action, not a failure: no retry prompt, and every live affordance is
             // dropped so the transcript cannot keep showing the stopped work.
-            _state.value = _state.value.copy(
-                agentState = AgentState.IDLE,
-                streamingText = "",
-                canRetry = false,
-                error = null,
-                runningTool = null,
-                liveCommand = null,
-                liveCommandOutput = ""
-            )
+            if (generation == sessionStore.turnGeneration) {
+                _state.value = _state.value.copy(
+                    agentState = AgentState.IDLE,
+                    streamingText = "",
+                    canRetry = false,
+                    error = null,
+                    runningTool = null,
+                    liveCommand = null,
+                    liveCommandOutput = ""
+                )
+            }
             withContext(NonCancellable) {
                 persistAssistant(sessionId, partial.toString(), MessageStatus.CANCELLED)
                 sessionRepository.updateStatus(
@@ -362,18 +369,39 @@ class AgentViewModel @Inject constructor(
                     SessionStatus.INTERRUPTED,
                     System.currentTimeMillis()
                 )
+                // The tool that was in flight will never report a result now, so close its row
+                // here as well as in [cancel] — this path also runs when the coroutine is killed
+                // by something other than the Stop button.
+                runCatching {
+                    toolEventRepository.closeOpenEvents(
+                        sessionId,
+                        ToolEventStatus.CANCELLED,
+                        STOPPED_NOTE
+                    )
+                }
             }
             throw cancel
         } catch (t: Throwable) {
             persistAssistant(sessionId, partial.toString(), MessageStatus.FAILED)
-            _state.value = _state.value.copy(
-                agentState = AgentState.FAILED,
-                error = t.message ?: "The agent failed.",
-                streamingText = "",
-                canRetry = true,
-                liveCommand = null,
-                liveCommandOutput = ""
-            )
+            // A crash leaves the same orphaned row a stop does; fail it so the spinner stops.
+            runCatching {
+                toolEventRepository.closeOpenEvents(
+                    sessionId,
+                    ToolEventStatus.FAILED,
+                    "The turn failed before this tool reported a result."
+                )
+            }
+            if (generation == sessionStore.turnGeneration) {
+                _state.value = _state.value.copy(
+                    agentState = AgentState.FAILED,
+                    error = t.message ?: "The agent failed.",
+                    streamingText = "",
+                    canRetry = true,
+                    runningTool = null,
+                    liveCommand = null,
+                    liveCommandOutput = ""
+                )
+            }
         } finally {
             runCatching { turnNotifier.onTurnStopped() }
         }
@@ -383,8 +411,13 @@ class AgentViewModel @Inject constructor(
         sessionId: String,
         event: AgentEvent,
         partial: StringBuilder,
-        lastReply: StringBuilder
+        lastReply: StringBuilder,
+        generation: Long
     ) {
+        // Stop is asynchronous: the job is cancelled, but an event already inside this collector
+        // still runs to completion because nothing in the handler suspends. Dropping everything
+        // from a superseded turn is what keeps the stopped tool from reappearing as "running".
+        if (generation != sessionStore.turnGeneration) return
         when (event) {
             is AgentEvent.State -> {
                 _state.value = _state.value.copy(
@@ -586,6 +619,20 @@ class AgentViewModel @Inject constructor(
                 _state.value = _state.value.copy(toolEvents = list)
             }
         }
+        // Reattaching to a session that is not running a turn means nothing is going to write a
+        // result for the rows that are still open — the app was killed, or the screen came back
+        // long after the stop. Close them, or every reopen shows a spinner that never ends.
+        if (!_state.value.isBusy) {
+            viewModelScope.launch {
+                runCatching {
+                    toolEventRepository.closeOpenEvents(
+                        sessionId,
+                        ToolEventStatus.CANCELLED,
+                        STOPPED_NOTE
+                    )
+                }
+            }
+        }
         todosJob = viewModelScope.launch {
             todoRepository.observeTodos(sessionId).collect { list ->
                 _state.value = _state.value.copy(todos = list)
@@ -660,6 +707,11 @@ class AgentViewModel @Inject constructor(
 
     fun cancel() {
         val sessionId = _state.value.sessionId
+        // Retire the running turn before anything else. Cancellation is cooperative: an event that
+        // the collector already holds would still be applied after this call, restoring
+        // RUNNING_TOOL and leaving the composer's Stop button and the phase pill on screen with
+        // nothing running. Every handler checks this counter, so the bump makes them all no-ops.
+        sessionStore.turnGeneration++
         // Flip the UI first: the turn coroutine only notices the cancellation at its next
         // suspension point, and until then the composer would still look busy and the stopped
         // command would still be on screen.
@@ -670,12 +722,29 @@ class AgentViewModel @Inject constructor(
             error = null,
             runningTool = null,
             liveCommand = null,
-            liveCommandOutput = ""
+            liveCommandOutput = "",
+            pendingApproval = null,
+            pendingApprovalReason = null,
+            pendingCommand = null,
+            pendingCommandReason = null
         )
         turnJob?.cancel()
+        runningToolIds.clear()
+        runningToolStartedAt.clear()
         if (sessionId != null) {
             orchestrator.resolveApproval(sessionId, false)
             orchestrator.resolvePlan(sessionId, approved = false)
+            // The stopped tool's row is still RUNNING in Room and no coroutine is left to write
+            // its result, so close it here. Otherwise the spinner outlives the app process.
+            sessionStore.scope.launch {
+                runCatching {
+                    toolEventRepository.closeOpenEvents(
+                        sessionId,
+                        ToolEventStatus.CANCELLED,
+                        STOPPED_NOTE
+                    )
+                }
+            }
         }
     }
 
@@ -874,5 +943,8 @@ class AgentViewModel @Inject constructor(
         const val MAX_MENTION_DEPTH = 6
         /** How much live command output to keep in the UI buffer. */
         const val LIVE_OUTPUT_CHARS = 8_000
+
+        /** Summary written onto a tool row that was still open when the turn stopped. */
+        const val STOPPED_NOTE = "Stopped before it finished."
     }
 }

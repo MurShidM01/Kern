@@ -158,6 +158,17 @@ interface ToolEventDao {
     @Query("SELECT * FROM tool_events WHERE sessionId = :sessionId ORDER BY createdAt ASC")
     fun observeBySession(sessionId: String): Flow<List<ToolEventEntity>>
 
+    /**
+     * Closes every row that is still waiting on the agent. Stopping a turn kills the coroutine
+     * that would have written the result, so without this the row keeps its spinner forever —
+     * including across app restarts, because the status is persisted.
+     */
+    @Query(
+        "UPDATE tool_events SET status = :status, resultSummary = :summary WHERE sessionId = :sessionId " +
+            "AND status IN ('PENDING', 'RUNNING', 'WAITING_APPROVAL', 'APPROVED')"
+    )
+    suspend fun closeOpen(sessionId: String, status: String, summary: String?)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: ToolEventEntity)
 

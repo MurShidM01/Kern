@@ -100,7 +100,14 @@ enum class ToolEventStatus {
     APPROVED,
     REJECTED,
     COMPLETED,
-    FAILED
+    FAILED,
+
+    /**
+     * The turn was stopped while this tool was still in flight. Terminal: nothing will ever
+     * report a result for it, so the transcript must render it as finished-and-abandoned rather
+     * than keep a spinner that outlives the process.
+     */
+    CANCELLED
 }
 
 /** Patch lifecycle (PRD 14.1 PendingPatch.status). */

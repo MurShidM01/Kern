@@ -1924,6 +1924,16 @@ private fun ToolRow(event: ToolEvent, liveOutput: String? = null) {
                     }
                 }
             }
+            // The label describes what the agent asked for, not how it ended, so a stopped
+            // command still reads "Running …". A trailing word says plainly that it did not
+            // finish, and unlike a suffix on the label it survives ellipsis.
+            if (event.status == ToolEventStatus.CANCELLED) {
+                Text(
+                    text = "Stopped",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             when (event.status) {
                 ToolEventStatus.RUNNING -> CircularProgressIndicator(
                     modifier = Modifier.size(KernSizes.iconXs),
@@ -1940,6 +1950,12 @@ private fun ToolRow(event: ToolEvent, liveOutput: String? = null) {
                     imageVector = KernIcons.Error,
                     contentDescription = "Failed",
                     tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(KernSizes.iconSm)
+                )
+                ToolEventStatus.CANCELLED -> Icon(
+                    imageVector = KernIcons.Stop,
+                    contentDescription = "Stopped",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(KernSizes.iconSm)
                 )
                 else -> Unit

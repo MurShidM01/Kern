@@ -34,4 +34,13 @@ class AgentSessionStore @Inject constructor() {
      * after a navigation round-trip and two screens can never start two turns at once.
      */
     var turnJob: Job? = null
+
+    /**
+     * Bumped whenever a turn starts and whenever the user stops one. Event handlers compare the
+     * generation they were started with against this value before touching the UI state: an event
+     * that was already inside the collector when Stop was pressed would otherwise write
+     * `RUNNING_TOOL` back over the idle state, leaving the composer's Stop button and the
+     * "Running …" phase pill on screen with nothing actually running.
+     */
+    var turnGeneration: Long = 0L
 }

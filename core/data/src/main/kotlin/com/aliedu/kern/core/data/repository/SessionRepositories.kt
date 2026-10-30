@@ -99,6 +99,13 @@ class DefaultMessageRepository @Inject constructor(
 interface ToolEventRepository {
     fun observeToolEvents(sessionId: String): Flow<List<ToolEvent>>
     suspend fun upsert(event: ToolEvent)
+
+    /**
+     * Terminally closes every tool row of [sessionId] that is still open, so a stopped or crashed
+     * turn cannot leave a row spinning in the transcript.
+     */
+    suspend fun closeOpenEvents(sessionId: String, status: ToolEventStatus, summary: String?)
+
     suspend fun updateResult(
         id: String,
         status: ToolEventStatus,
@@ -118,6 +125,12 @@ class DefaultToolEventRepository @Inject constructor(
         dao.observeBySession(sessionId).map { it.map { e -> e.toDomain() } }
 
     override suspend fun upsert(event: ToolEvent) = dao.upsert(event.toEntity())
+
+    override suspend fun closeOpenEvents(
+        sessionId: String,
+        status: ToolEventStatus,
+        summary: String?
+    ) = dao.closeOpen(sessionId, status.name, summary)
 
     override suspend fun updateResult(
         id: String,
