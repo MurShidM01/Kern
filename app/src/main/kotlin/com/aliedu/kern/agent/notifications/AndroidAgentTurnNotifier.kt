@@ -36,9 +36,12 @@ class AndroidAgentTurnNotifier @Inject constructor(
         if (reply.isBlank()) return
         AgentTurnNotifications.ensureChannel(context)
         val notification = AgentTurnNotifications.build(context, workspaceName, reply)
+        // POST_NOTIFICATIONS is revocable at runtime, and a turn that finished must not crash the
+        // app on its way out because of it. The manager reports whether it can post at all.
+        val manager = NotificationManagerCompat.from(context)
+        if (!manager.areNotificationsEnabled()) return
         runCatching {
-            NotificationManagerCompat.from(context)
-                .notify(AgentTurnNotifications.NOTIFICATION_ID, notification)
+            manager.notify(AgentTurnNotifications.NOTIFICATION_ID, notification)
         }
     }
 }
