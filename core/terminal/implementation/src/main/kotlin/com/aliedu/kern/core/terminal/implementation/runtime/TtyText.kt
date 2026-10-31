@@ -23,34 +23,4 @@ internal object TtyText {
             .replace(ANSI_TWO_CHAR, "")
             .replace("\r", "")
 
-    /**
-     * Index just past the tty's echo of [script] in [text], or -1 if it is not present near the
-     * head. The tty may render a newline as CRLF and wrap long lines, so we match the script
-     * character by character while ignoring carriage returns and newlines.
-     */
-    fun findEchoEnd(text: String, script: String): Int {
-        if (script.isEmpty()) return -1
-        val limit = (script.length * 2 + 64).coerceAtMost(text.length)
-        for (start in 0..limit) {
-            var i = start
-            var j = 0
-            while (i < text.length && j < script.length) {
-                val expected = script[j]
-                if (expected == '\n') {
-                    j++
-                    continue
-                }
-                val actual = text[i]
-                if (actual == '\r' || actual == '\n') {
-                    i++
-                    continue
-                }
-                if (actual != expected) break
-                i++
-                j++
-            }
-            if (j == script.length) return i
-        }
-        return -1
-    }
 }

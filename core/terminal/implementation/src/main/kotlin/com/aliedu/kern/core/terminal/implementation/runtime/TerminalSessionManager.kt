@@ -11,7 +11,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
@@ -81,6 +83,22 @@ class TerminalSessionManager @Inject constructor(
     fun replay(id: String): String = sessions[id]?.replay() ?: ""
 
     fun isAlive(id: String): Boolean = sessions[id]?.isAlive ?: false
+
+    /** Collectors attached to the session output right now; 0 when the session is gone. */
+    fun subscriberCount(id: String): Int =
+        sessions[id]?.subscriberCount?.value ?: 0
+
+    /**
+     * Waits until [count] collectors are attached, so a caller can write to the shell knowing its
+     * own collector is registered and cannot miss the first chunk. False on timeout or no session.
+     */
+    suspend fun awaitSubscriber(id: String, count: Int, timeoutMs: Long): Boolean {
+        val session = sessions[id] ?: return false
+        if (session.subscriberCount.value >= count) return true
+        return withTimeoutOrNull(timeoutMs) {
+            session.subscriberCount.first { it >= count }
+        } != null
+    }
 
     fun requestStop(id: String) {
         sessions[id]?.requestStop()

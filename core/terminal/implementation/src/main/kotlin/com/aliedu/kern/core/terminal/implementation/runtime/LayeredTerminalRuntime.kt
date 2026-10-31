@@ -75,6 +75,16 @@ class LayeredTerminalRuntime @Inject constructor(
 
     override suspend fun requestStop(sessionId: String) = sessions.requestStop(sessionId)
 
+    override suspend fun isSessionAlive(sessionId: String): Boolean = sessions.isAlive(sessionId)
+
+    override fun outputSubscriberCount(sessionId: String): Int = sessions.subscriberCount(sessionId)
+
+    override suspend fun awaitOutputSubscriber(
+        sessionId: String,
+        count: Int,
+        timeoutMs: Long
+    ): Boolean = sessions.awaitSubscriber(sessionId, count, timeoutMs)
+
     override fun resizeSession(sessionId: String, columns: Int, rows: Int) =
         sessions.resize(sessionId, columns, rows)
 

@@ -16,7 +16,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
@@ -37,6 +39,14 @@ class BackgroundJobManagerTest {
         var outputText = "downloading…\ndone\n"
         var exitCode = 0
         var autoRespond = true
+
+        /** False makes the shell refuse the command, as a dead session would. */
+        var acceptsCommands = true
+
+        private val subscribers = mutableMapOf<String, Int>()
+
+        /** True when a script was written before anyone was listening for output. */
+        var wroteBeforeSubscribing = false
 
         val sent = mutableListOf<String>()
         val closed = mutableListOf<String>()
@@ -60,9 +70,16 @@ class BackgroundJobManagerTest {
         override fun sendInput(sessionId: String, input: ByteArray) {
             val text = String(input, Charsets.UTF_8)
             sent.add(text)
-            if (!autoRespond) return
-            val marker = Regex("__KERN_JOB_[a-f0-9]+__").find(text)?.value ?: return
+            if (outputSubscriberCount(sessionId) == 0) wroteBeforeSubscribing = true
+            // The shell builds its marker from the seed, so the start marker comes before the
+            // command output and the exit marker after it — exactly like a real shell.
+            val seed = Regex("KERN_S=([a-f0-9]+)").find(text)?.groupValues?.get(1) ?: return
+            val marker = "__KERN_JOB_" + seed + "__"
             scope.launch {
+                // The start marker always comes first: it is how the manager knows the shell is
+                // actually running the script.
+                flows[sessionId]?.emit(TerminalOutput.Stdout("\n" + marker + "\n"))
+                if (!autoRespond) return@launch
                 flows[sessionId]?.emit(TerminalOutput.Stdout(outputText))
                 flows[sessionId]?.emit(TerminalOutput.Stdout("\n" + marker + " " + exitCode + "\n"))
             }
@@ -73,8 +90,33 @@ class BackgroundJobManagerTest {
             scope.launch { flows[sessionId]?.emit(TerminalOutput.Stdout(text)) }
         }
 
-        override fun observeOutput(sessionId: String): Flow<TerminalOutput> =
-            flows[sessionId] ?: emptyFlow()
+        override fun observeOutput(sessionId: String): Flow<TerminalOutput> {
+            val stream = flows[sessionId] ?: return emptyFlow()
+            return stream.onSubscription {
+                synchronized(subscribers) {
+                    subscribers[sessionId] = (subscribers[sessionId] ?: 0) + 1
+                }
+            }
+        }
+
+        override fun outputSubscriberCount(sessionId: String): Int =
+            synchronized(subscribers) { subscribers[sessionId] ?: 0 }
+
+        override suspend fun awaitOutputSubscriber(
+            sessionId: String,
+            count: Int,
+            timeoutMs: Long
+        ): Boolean {
+            if (!acceptsCommands) return false
+            val deadline = System.currentTimeMillis() + timeoutMs
+            while (System.currentTimeMillis() < deadline) {
+                if (outputSubscriberCount(sessionId) >= count) return true
+                delay(5)
+            }
+            return outputSubscriberCount(sessionId) >= count
+        }
+
+        override suspend fun isSessionAlive(sessionId: String): Boolean = acceptsCommands
 
         override suspend fun requestStop(sessionId: String) {
             stopped.add(sessionId)
@@ -103,9 +145,14 @@ class BackgroundJobManagerTest {
         assertThat(job.exitCode).isNull()
         // The executor must not reuse (and then kill) the shell a job is working in.
         assertThat(jobs.isOwned("s1")).isTrue()
-        // The command is followed by a sentinel the shell expands, which is how the exit code
-        // comes back without waiting for the shell itself to exit.
-        assertThat(runtime.sent.single()).contains("apt-get install -y openjdk-17-jdk")
+        // The command travels base64-encoded, so it reaches the shell byte-for-byte without the
+        // tty re-wrapping or mangling it.
+        val encoded = Regex("printf %s '([A-Za-z0-9+/=]+)'").findAll(runtime.sent.single())
+            .joinToString("") { it.groupValues[1] }
+        val payload = String(java.util.Base64.getDecoder().decode(encoded), Charsets.UTF_8)
+        assertThat(payload).contains("apt-get install -y openjdk-17-jdk")
+        // The sentinel is on the same input line as the command, so a stdin-reading command cannot
+        // swallow it, and it is built by the shell so the echo never contains it.
         assertThat(runtime.sent.single()).contains("__KERN_JOB_")
     }
 
@@ -193,6 +240,52 @@ class BackgroundJobManagerTest {
         val rest = jobs.output(job.id, 5)
         assertThat(rest?.text).isEqualTo(all?.text?.substring(5))
         assertThat(rest?.nextCursor).isEqualTo(all?.text?.length)
+    }
+
+
+    @Test
+    fun `the job script is never written before its collector is attached`(): Unit = runBlocking {
+        // A job that finishes instantly prints its output and its sentinel in one chunk. Losing
+        // that chunk left the job RUNNING with nothing left that could ever finish it.
+        val runtime = FakeRuntime()
+        val jobs = manager(runtime)
+
+        val job = jobs.start("echo hi", "ws", "/exec/ws").getOrThrow()
+        assertThat(waitUntil { jobs.status(job.id)?.state?.isTerminal == true }).isTrue()
+
+        assertThat(runtime.wroteBeforeSubscribing).isFalse()
+        assertThat(jobs.status(job.id)?.state).isEqualTo(BackgroundJobState.SUCCEEDED)
+    }
+
+    @Test
+    fun `a shell that never accepts the command leaves no running job behind`(): Unit = runBlocking {
+        val runtime = FakeRuntime().apply { acceptsCommands = false }
+        val jobs = manager(runtime)
+
+        val started = jobs.start("sleep 600", "ws", "/exec/ws")
+
+        assertThat(started.isFailure).isTrue()
+        assertThat(jobs.jobs.value.none { it.running }).isTrue()
+        assertThat(jobs.jobs.value.single().state).isEqualTo(BackgroundJobState.FAILED)
+        // The shell it opened is not left owned by a job that never started.
+        assertThat(jobs.isOwned("s1")).isFalse()
+    }
+
+    @Test
+    fun `a running job publishes its output as it arrives`(): Unit = runBlocking {
+        // `background_output` and the transcript card used to see nothing until the job ended, so
+        // a long install looked silent while it was actually working.
+        val runtime = FakeRuntime().apply { autoRespond = false }
+        val jobs = manager(runtime)
+
+        val job = jobs.start("apt-get install -y openjdk-17-jdk", "ws", "/exec/ws").getOrThrow()
+        // The start marker is what tells the gate where the echo ends, so it comes first.
+        runtime.emit("s1", "reading package lists\n")
+
+        assertThat(waitUntil { jobs.status(job.id)?.output?.contains("reading package lists") == true })
+            .isTrue()
+        assertThat(jobs.status(job.id)?.state).isEqualTo(BackgroundJobState.RUNNING)
+        assertThat(jobs.output(job.id, 0)?.text).contains("reading package lists")
     }
 
     @Test

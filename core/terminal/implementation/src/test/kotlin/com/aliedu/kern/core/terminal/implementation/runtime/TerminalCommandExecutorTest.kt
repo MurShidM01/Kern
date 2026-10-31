@@ -24,15 +24,18 @@ import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Test
 
 class TerminalCommandExecutorTest {
@@ -57,6 +60,14 @@ class TerminalCommandExecutorTest {
         val stopped = mutableListOf<String>()
         val sentScripts = mutableListOf<String>()
 
+        /** Sessions that no longer have a live process. */
+        val deadSessions = mutableSetOf<String>()
+
+        private val subscribers = mutableMapOf<String, Int>()
+
+        /** True when a script was written before anyone was listening for output. */
+        var wroteBeforeSubscribing = false
+
         override suspend fun inspectInstallState() = EnvironmentInfo(EnvironmentState.READY)
         override fun installOrRepair(
         distroId: String?,
@@ -75,9 +86,18 @@ class TerminalCommandExecutorTest {
         override fun sendInput(sessionId: String, input: ByteArray) {
             val text = String(input, Charsets.UTF_8)
             sentScripts.add(text)
-            val marker = Regex("__KERN_DONE_[a-f0-9]+__").find(text)?.value ?: return
+            // The regression this guards: writing before the collector is registered loses the
+            // first chunk, and a fast command prints everything — including its sentinel — in it.
+            if (outputSubscriberCount(sessionId) == 0) wroteBeforeSubscribing = true
+            // The shell builds its marker from the seed it was given, so the fake does the same:
+            // the start marker is printed before the command runs, exactly like a real shell.
+            val seed = Regex("KERN_S=([a-f0-9]+)").find(text)?.groupValues?.get(1) ?: return
+            val marker = "__KERN_" + seed + "__"
             scope.launch {
                 delay(20)
+                // The start marker is printed as soon as the shell runs the script, whether or not
+                // the command itself ever finishes.
+                flows[sessionId]?.emit(TerminalOutput.Stdout("\n$marker\n"))
                 if (respond) {
                     flows[sessionId]?.emit(TerminalOutput.Stdout(outputText))
                     flows[sessionId]?.emit(TerminalOutput.Stdout("\n$marker $exitCode\n"))
@@ -85,8 +105,34 @@ class TerminalCommandExecutorTest {
             }
         }
 
-        override fun observeOutput(sessionId: String): Flow<TerminalOutput> =
-            flows[sessionId] ?: emptyFlow()
+        override fun observeOutput(sessionId: String): Flow<TerminalOutput> {
+            val stream = flows[sessionId] ?: return emptyFlow()
+            // Counted after registration, the way the real shared flow does it.
+            return stream.onSubscription {
+                synchronized(subscribers) {
+                    subscribers[sessionId] = (subscribers[sessionId] ?: 0) + 1
+                }
+            }
+        }
+
+        override fun outputSubscriberCount(sessionId: String): Int =
+            synchronized(subscribers) { subscribers[sessionId] ?: 0 }
+
+        override suspend fun awaitOutputSubscriber(
+            sessionId: String,
+            count: Int,
+            timeoutMs: Long
+        ): Boolean {
+            val deadline = System.currentTimeMillis() + timeoutMs
+            while (System.currentTimeMillis() < deadline) {
+                if (outputSubscriberCount(sessionId) >= count) return true
+                delay(5)
+            }
+            return outputSubscriberCount(sessionId) >= count
+        }
+
+        override suspend fun isSessionAlive(sessionId: String): Boolean =
+            sessionId !in deadSessions
 
         override suspend fun guestPath(hostPath: String): String? = guestCwd
 
@@ -235,7 +281,10 @@ class TerminalCommandExecutorTest {
         val runtime = FakeRuntime().apply { guestCwd = "/workspace" }
         executor(runtime).run(request("pwd"))
 
-        assertThat(runtime.sentScripts.single()).startsWith("cd -- '/workspace' 2>/dev/null || echo ")
+        val encoded = Regex("printf %s '([A-Za-z0-9+/=]+)'").findAll(runtime.sentScripts.single())
+            .joinToString("") { it.groupValues[1] }
+        val payload = String(java.util.Base64.getDecoder().decode(encoded), Charsets.UTF_8)
+        assertThat(payload).contains("cd -- '/workspace' 2>/dev/null || echo ")
     }
 
     @Test
@@ -304,10 +353,18 @@ class TerminalCommandExecutorTest {
         // rootfs cannot see must not fail the command itself.
         // The cd is best-effort, but no longer silent: a workspace the guest cannot see now says so
         // instead of quietly running the command in the previous directory.
-        assertThat(script).startsWith("cd -- '/exec/ws' 2>/dev/null || echo ")
-        assertThat(script).contains("; echo hi\n")
+        // The command is base64-encoded so the whole script is one input line: a command that
+        // reads stdin must not be able to swallow the sentinel that follows it.
+        assertThat(script).contains("base64 -d ")
+        assertThat(script).contains("sh ")
         assertThat(script).contains("printf")
-        assertThat(script).contains("$?")
+        assertThat(script).contains("KERN_E")
+        // The cd travels inside the encoded payload, so it cannot be eaten either.
+        val encoded = Regex("printf %s '([A-Za-z0-9+/=]+)'").findAll(script)
+            .joinToString("") { it.groupValues[1] }
+        val payload = String(java.util.Base64.getDecoder().decode(encoded), Charsets.UTF_8)
+        assertThat(payload).contains("cd -- '/exec/ws' 2>/dev/null || echo ")
+        assertThat(payload).contains("echo hi")
     }
 
     @Test
@@ -363,6 +420,51 @@ class TerminalCommandExecutorTest {
         // The foreground sentinel path was never used, so nothing can kill the job.
         assertThat(runtime.sentScripts).isEmpty()
         assertThat(runtime.stopped).isEmpty()
+    }
+
+
+    @Test
+    fun `the script is never written before the output collector is attached`() = runBlocking {
+        // Regression: `onStart` fires before the shared flow registers the collector, so a fast
+        // command could print its whole output — and its sentinel — into nobody, and the run then
+        // waited forever because there is no timeout to end it.
+        val runtime = FakeRuntime()
+        val result = executor(runtime).run(request("pwd"))
+
+        assertThat(runtime.wroteBeforeSubscribing).isFalse()
+        assertThat(result.exitCode).isEqualTo(0)
+    }
+
+    @Test
+    fun `a shell that disappears mid-command ends the run instead of hanging`() = runBlocking {
+        val runtime = FakeRuntime().apply { respond = false }
+        val run = async(Dispatchers.Default) { executor(runtime).run(request("sleep 100")) }
+        delay(300)
+
+        // The shell is gone but its output stream never said so: without the liveness check the
+        // run would wait for a sentinel that can never arrive.
+        runtime.deadSessions.add("s1")
+
+        val result = withTimeout(10_000) { run.await() }
+        assertThat(result.exitCode).isEqualTo(-1)
+        assertThat(result.output).contains("exited before the command printed an exit status")
+        assertThat(result.succeeded).isFalse()
+    }
+
+    @Test
+    fun `a dead session is never reused`() = runBlocking {
+        // Stop kills the shell. Reusing it afterwards writes into a closed PTY: the write succeeds,
+        // nothing is printed, and the next command waits forever.
+        val runtime = FakeRuntime().apply {
+            existing = TerminalSession("dead", "Shell", "/exec/ws")
+            deadSessions.add("dead")
+        }
+
+        val result = withTimeout(10_000) { executor(runtime).run(request("pwd")) }
+
+        assertThat(runtime.createCalls).isEqualTo(1)
+        assertThat(runtime.sentScripts).hasSize(1)
+        assertThat(result.exitCode).isEqualTo(0)
     }
 
     @Test

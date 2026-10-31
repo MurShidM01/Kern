@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -30,6 +31,14 @@ class ShellSession(
 
     private val _output = MutableSharedFlow<TerminalOutput>(extraBufferCapacity = 1024)
     val output: SharedFlow<TerminalOutput> = _output.asSharedFlow()
+
+    /**
+     * Collectors attached right now. The stream has no replay, so a chunk emitted before a
+     * collector registers is lost — and losing the first chunk of a fast command means losing its
+     * exit sentinel, which leaves the caller waiting forever. Callers prove subscription with this
+     * before writing anything to the shell.
+     */
+    val subscriberCount: StateFlow<Int> get() = _output.subscriptionCount
 
     private val ring = StringBuilder()
     private val ringLock = Any()

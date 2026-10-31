@@ -114,6 +114,39 @@ interface TerminalRuntime {
     suspend fun closeSession(sessionId: String)
     suspend fun uninstallEnvironment(): Result<Unit>
 
+    /**
+     * Whether [sessionId] is still backed by a live process.
+     *
+     * A dead shell is the worst thing to reuse: writing to it succeeds silently, no output is ever
+     * produced, and a caller that waits for the command to report back waits forever. Every caller
+     * that caches a session id must check this before trusting it.
+     */
+    suspend fun isSessionAlive(sessionId: String): Boolean = true
+
+    /**
+     * How many collectors are attached to [sessionId] output right now.
+     *
+     * Used together with [awaitOutputSubscriber]: a caller captures the current count, starts its
+     * own collector, and then waits for one more. A terminal screen already watching the same shell
+     * would otherwise satisfy the wait on the caller behalf and the write would still race.
+     */
+    fun outputSubscriberCount(sessionId: String): Int = 0
+
+    /**
+     * Suspends until at least [count] collectors are attached to [sessionId] output, or
+     * [timeoutMs] elapses. Returns false on timeout or when the session does not exist.
+     *
+     * The onStart operator is not proof of subscription: it runs *before* the shared flow registers
+     * the collector. A command written on the strength of it can lose its first chunk — and with it
+     * the exit sentinel — which is indistinguishable from a command that never finishes, because
+     * nothing else would ever end the wait.
+     */
+    suspend fun awaitOutputSubscriber(
+        sessionId: String,
+        count: Int,
+        timeoutMs: Long = 2_000
+    ): Boolean = true
+
     /** Sessions currently held by the runtime (FR-016). Defaults keep Part 1 placeholders compiling. */
     suspend fun listSessions(): List<TerminalSession> = emptyList()
 

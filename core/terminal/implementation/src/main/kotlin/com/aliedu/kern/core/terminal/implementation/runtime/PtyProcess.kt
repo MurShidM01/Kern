@@ -49,14 +49,8 @@ class PtyProcess(
 
     override fun terminate() {
         if (closed || !isAlive) return
-        Pty.killProcessGroup(pid, Pty.SIGTERM)
-        Thread {
-            runCatching { Thread.sleep(KILL_GRACE_MS) }
-            if (isAlive) runCatching { Pty.killProcessGroup(pid, Pty.SIGKILL) }
-        }.apply {
-            isDaemon = true
-            name = "kern-pty-kill-$pid"
-        }.start()
+        runCatching { Pty.killProcessGroup(pid, Pty.SIGTERM) }
+        scheduleKill()
     }
 
     override fun close() {
@@ -64,6 +58,28 @@ class PtyProcess(
         closed = true
         runCatching { Pty.hangupProcessGroup(pid) }
         runCatching { Pty.close(masterFd) }
+        // The hangup normally ends the guest, but a process that ignores SIGHUP (a shell started
+        // with nohup, a stuck dpkg) would outlive its session and keep the workspace locked. The
+        // escalation must not depend on [isAlive]: close() sets [closed] first, so the old check
+        // was always false here and the SIGKILL was never sent.
+        scheduleKill()
+    }
+
+    /**
+     * Sends SIGKILL to the process group unless the guest has already exited. Guarded by the exit
+     * code rather than [closed], so closing a session does not cancel a kill that terminate() just
+     * scheduled.
+     */
+    private fun scheduleKill() {
+        Thread {
+            runCatching { Thread.sleep(KILL_GRACE_MS) }
+            if (exitCode.get() == EXIT_UNSET) {
+                runCatching { Pty.killProcessGroup(pid, Pty.SIGKILL) }
+            }
+        }.apply {
+            isDaemon = true
+            name = "kern-pty-kill-$pid"
+        }.start()
     }
 
     private companion object {

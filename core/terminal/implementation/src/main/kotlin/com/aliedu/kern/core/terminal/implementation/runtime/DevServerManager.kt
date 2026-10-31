@@ -8,7 +8,6 @@ import com.aliedu.kern.core.tools.devserver.DevServer
 import com.aliedu.kern.core.tools.devserver.DevServerRegistry
 import com.aliedu.kern.core.tools.devserver.DevServerState
 import com.aliedu.kern.core.tools.devserver.localPreviewUrl
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -16,7 +15,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -96,7 +94,10 @@ class DevServerManager @Inject constructor(
         // drained; cancelling it would leave the guest's output flowing into a SharedFlow nobody
         // reads. Forwarding to the caller stops at readiness so a chatty server cannot grow the
         // orchestrator's buffer.
-        val subscribed = CompletableDeferred<Unit>()
+        // `onStart` is not proof of subscription: it runs before the shared flow registers the
+        // collector, so a server that prints its banner immediately could lose it — and with it the
+        // only evidence of the port it chose.
+        val subscribersBefore = runtime.outputSubscriberCount(session.id)
         // A server that crashes returns to the prompt, so an `echo` queued after the command line
         // reports its exit status. The tty echoes that line too, but with `$?` unexpanded — no
         // digits — so a numeric match can only be the real status. Watching only the shell's own
@@ -106,7 +107,6 @@ class DevServerManager @Inject constructor(
         val tail = StringBuilder()
         val collector = scope.launch {
             runtime.observeOutput(session.id)
-                .onStart { subscribed.complete(Unit) }
                 .collect { output ->
                     val text = when (output) {
                         is TerminalOutput.Stdout -> output.text
@@ -133,7 +133,13 @@ class DevServerManager @Inject constructor(
         try {
             // Subscribe before sending, or a server that prints its banner immediately would have
             // that output dropped and its port would never be discovered.
-            subscribed.await()
+            if (!runtime.awaitOutputSubscriber(session.id, subscribersBefore + 1) ||
+                !runtime.isSessionAlive(session.id)
+            ) {
+                return Result.failure(
+                    IllegalStateException("The shell did not accept the server command.")
+                )
+            }
             val script = command + "\necho \"" + marker + " " + EXIT_STATUS + "\"\n"
             runtime.sendInput(session.id, script.toByteArray(Charsets.UTF_8))
 
