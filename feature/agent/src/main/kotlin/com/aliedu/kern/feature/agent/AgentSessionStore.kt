@@ -1,5 +1,6 @@
 package com.aliedu.kern.feature.agent
 
+import com.aliedu.kern.core.agent.AgentState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -43,4 +44,18 @@ class AgentSessionStore @Inject constructor() {
      * "Running …" phase pill on screen with nothing actually running.
      */
     var turnGeneration: Long = 0L
+
+    /**
+     * The session whose turn is running right now, if any.
+     *
+     * The screen can be switched to another session while a turn is still streaming — the turn
+     * itself is not tied to a screen, so it keeps going. This is what tells the two apart: events
+     * from a turn that belongs to a session the user has left must not paint the transcript they
+     * are looking at, and re-attaching to a session whose turn is running must not treat its open
+     * tool rows as orphans of a dead turn.
+     */
+    var runningTurnSessionId: String? = null
+
+    /** The phase the running turn last reported, restored when the user comes back to it. */
+    var runningTurnState: AgentState = AgentState.IDLE
 }

@@ -248,6 +248,20 @@ class AgentViewModel @Inject constructor(
             _state.value = _state.value.copy(error = "Configure an AI provider first.")
             return
         }
+        // One turn at a time, across every session: the transcript, the composer and the
+        // workspace's shell are all single. Two turns would interleave their output, and Stop
+        // could only ever cancel the newer one.
+        val running = sessionStore.runningTurnSessionId
+        if (running != null) {
+            _state.value = _state.value.copy(
+                error = if (running == _state.value.sessionId) {
+                    "This task is still running. Stop it before sending another message."
+                } else {
+                    "Another task is still running. Stop it before starting a new one."
+                }
+            )
+            return
+        }
 
         // Claim a generation before the job starts: a turn that is stopped mid-flight must not
         // be able to write over the state of the turn that replaces it.
@@ -287,7 +301,7 @@ class AgentViewModel @Inject constructor(
         val workspace = _state.value.workspace ?: return
         val profile = activeProfile ?: return
         val wsAdapter = adapter ?: return
-        if (_state.value.isBusy) return
+        if (_state.value.isBusy || sessionStore.runningTurnSessionId != null) return
 
         val messages = _state.value.messages.filter { it.sessionId == sessionId }
         val lastUserIndex = messages.indexOfLast { it.role == MessageRole.USER }
@@ -329,6 +343,10 @@ class AgentViewModel @Inject constructor(
         // [partial] is reset every time a message is committed, so it is empty by the time the turn
         // ends. Keep the last committed reply separately for the "task finished" notification.
         val lastReply = StringBuilder()
+        // Claim the session for this turn, so a screen that opens another one knows the difference
+        // between "this session is working" and "some other session is".
+        sessionStore.runningTurnSessionId = sessionId
+        sessionStore.runningTurnState = AgentState.REQUESTING_MODEL
         // Promote to the foreground for the whole turn: Android otherwise freezes the process when
         // the user switches apps, which used to kill the provider stream half-way through a task.
         runCatching { turnNotifier.onTurnStarted(workspace.displayName) }
@@ -417,6 +435,14 @@ class AgentViewModel @Inject constructor(
                 )
             }
         } finally {
+            // Only release the claim if it is still this turn's: Stop bumps the generation and a
+            // new turn may already own the session by the time this coroutine unwinds.
+            if (sessionStore.runningTurnSessionId == sessionId &&
+                generation == sessionStore.turnGeneration
+            ) {
+                sessionStore.runningTurnSessionId = null
+                sessionStore.runningTurnState = AgentState.IDLE
+            }
             runCatching { turnNotifier.onTurnStopped() }
         }
     }
@@ -432,23 +458,32 @@ class AgentViewModel @Inject constructor(
         // still runs to completion because nothing in the handler suspends. Dropping everything
         // from a superseded turn is what keeps the stopped tool from reappearing as "running".
         if (generation != sessionStore.turnGeneration) return
+        // The user may have opened another session while this turn streams. The turn keeps going —
+        // it is not owned by the screen — but its text must not appear under a transcript it does
+        // not belong to. Approvals still surface: the turn is blocked until one is answered.
+        val visible = _state.value.sessionId == sessionId
         when (event) {
             is AgentEvent.State -> {
-                _state.value = _state.value.copy(
-                    agentState = event.state,
-                    runningTool = if (event.state == AgentState.RUNNING_TOOL) event.detail else null
-                )
+                sessionStore.runningTurnState = event.state
+                if (visible) {
+                    _state.value = _state.value.copy(
+                        agentState = event.state,
+                        runningTool = if (event.state == AgentState.RUNNING_TOOL) event.detail else null
+                    )
+                }
             }
 
             is AgentEvent.Delta -> {
                 partial.append(event.text)
-                _state.value = _state.value.copy(streamingText = partial.toString())
+                if (visible) _state.value = _state.value.copy(streamingText = partial.toString())
             }
 
             is AgentEvent.ReasoningDelta -> {
-                _state.value = _state.value.copy(
-                    reasoningText = _state.value.reasoningText + event.text
-                )
+                if (visible) {
+                    _state.value = _state.value.copy(
+                        reasoningText = _state.value.reasoningText + event.text
+                    )
+                }
             }
 
             is AgentEvent.AssistantMessage -> {
@@ -637,7 +672,9 @@ class AgentViewModel @Inject constructor(
         // Reattaching to a session that is not running a turn means nothing is going to write a
         // result for the rows that are still open — the app was killed, or the screen came back
         // long after the stop. Close them, or every reopen shows a spinner that never ends.
-        if (!_state.value.isBusy) {
+        // The test is per session: another session's turn must not keep this one's stale rows open,
+        // and this session's own running turn must not have its rows closed underneath it.
+        if (sessionStore.runningTurnSessionId != sessionId) {
             viewModelScope.launch {
                 runCatching {
                     toolEventRepository.closeOpenEvents(
@@ -727,6 +764,10 @@ class AgentViewModel @Inject constructor(
         // RUNNING_TOOL and leaving the composer's Stop button and the phase pill on screen with
         // nothing running. Every handler checks this counter, so the bump makes them all no-ops.
         sessionStore.turnGeneration++
+        // Release the session now, not when the cancelled coroutine unwinds: the user can send the
+        // next message immediately, and that message must not be refused as "still running".
+        sessionStore.runningTurnSessionId = null
+        sessionStore.runningTurnState = AgentState.IDLE
         // Flip the UI first: the turn coroutine only notices the cancellation at its next
         // suspension point, and until then the composer would still look busy and the stopped
         // command would still be on screen.
@@ -931,7 +972,20 @@ class AgentViewModel @Inject constructor(
                     }
                 }
             }
-            _state.value = _state.value.copy(sessionId = sessionId, streamingText = "", error = null)
+            // Another session's turn keeps running, but it is not this session's state: show this
+            // one as it really is, and restore the phase if the user comes back to the session
+            // that is actually working.
+            val runningHere = sessionStore.runningTurnSessionId == sessionId
+            _state.value = _state.value.copy(
+                sessionId = sessionId,
+                streamingText = "",
+                reasoningText = "",
+                error = null,
+                agentState = if (runningHere) sessionStore.runningTurnState else AgentState.IDLE,
+                runningTool = null,
+                liveCommand = null,
+                liveCommandOutput = ""
+            )
             observeSession(sessionId)
         }
     }
