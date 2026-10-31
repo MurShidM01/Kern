@@ -212,6 +212,14 @@ class TerminalCommandExecutor @Inject constructor(
         val script = buildString {
             append("KERN_S=").append(seed)
             append("; KERN_M=\"__KERN_").append(DOLLAR).append("{KERN_S}__\"")
+            // The interactive shell echoes every line it reads, and it reads line by line: it
+            // executes this first line (printing the marker) before the remaining lines are even
+            // echoed. The marker therefore landed in the middle of the echo, and everything after
+            // it — the base64 writes, the sentinel line — reached the model and the job card as if
+            // the command had printed it. Turning the editor and the echo off before the second
+            // line is read leaves the marker as the last thing the terminal echoes, which is
+            // exactly what [OutputGate] drops.
+            append("; set +o emacs 2>/dev/null; set +o vi 2>/dev/null; stty -echo 2>/dev/null")
             append("; printf '\\n%s\\n' \"").append(DOLLAR).append("KERN_M\"\n")
             append(": > ").append(cmdFile).append('\n')
             encoded.chunked(BASE64_CHUNK_CHARS).forEach { chunk ->
@@ -221,7 +229,7 @@ class TerminalCommandExecutor @Inject constructor(
             append("sh ").append(cmdFile).append(".sh; KERN_E=").append(DOLLAR).append("?; ")
             append("printf '\\n%s %s\\n' \"").append(DOLLAR).append("KERN_M\" \"")
                 .append(DOLLAR).append("KERN_E\"; rm -f ").append(cmdFile).append(' ')
-                .append(cmdFile).append(".sh\n")
+                .append(cmdFile).append(".sh; stty echo 2>/dev/null; set -o emacs 2>/dev/null\n")
         }
         // Keeps the head *and* the tail: a failing install prints its error last, and a cap that
         // only keeps the first N characters hands the model the one part that explains nothing.

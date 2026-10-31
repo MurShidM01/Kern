@@ -99,6 +99,11 @@ class BackgroundJobManager @Inject constructor(
         val script = buildString {
             append("KERN_S=").append(seed)
             append("; KERN_M=\"__KERN_JOB_").append(DOLLAR).append("{KERN_S}__\"")
+            // The shell echoes the lines it reads, and it executes the first one before echoing the
+            // rest, so the start marker used to land in the middle of the echo and every line after
+            // it was kept as job output. With the editor and the echo off before the second line is
+            // read, the marker is the last thing echoed and the gate drops all of it.
+            append("; set +o emacs 2>/dev/null; set +o vi 2>/dev/null; stty -echo 2>/dev/null")
             append("; printf '\\n%s\\n' \"").append(DOLLAR).append("KERN_M\"\n")
             append(": > ").append(cmdFile).append('\n')
             encoded.chunked(BASE64_CHUNK_CHARS).forEach { chunk ->
@@ -108,7 +113,7 @@ class BackgroundJobManager @Inject constructor(
             append("sh ").append(cmdFile).append(".sh; KERN_E=").append(DOLLAR).append("?; ")
             append("printf '\\n%s %s\\n' \"").append(DOLLAR).append("KERN_M\" \"")
                 .append(DOLLAR).append("KERN_E\"; rm -f ").append(cmdFile).append(' ')
-                .append(cmdFile).append(".sh\n")
+                .append(cmdFile).append(".sh; stty echo 2>/dev/null; set -o emacs 2>/dev/null\n")
         }
 
         val run = JobRun(marker, maxOutputChars, script.length * 2 + 2_048)
@@ -334,7 +339,7 @@ class BackgroundJobManager @Inject constructor(
             tail.append(text)
             if (tail.length > MARKER_TAIL) tail.delete(0, tail.length - MARKER_TAIL)
             val body = gate.accept(text)
-            if (body != null && body.isNotEmpty()) buffer.append(body)
+            if (body.isNotEmpty()) buffer.append(body)
         }
 
         /** The sentinel's exit status once the command has finished, else null. */
