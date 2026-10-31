@@ -1,6 +1,7 @@
 package com.aliedu.kern.feature.files
 
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -591,6 +592,9 @@ fun EditorScreen(
         state.savedAt != null -> semantic.success
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
+    // The system back gesture must ask the same question the app bar's back arrow asks.
+    var confirmDiscard by remember(state.path) { mutableStateOf(false) }
+    BackHandler(enabled = state.isDirty) { confirmDiscard = true }
 
     KernScaffold(
         topBar = {
@@ -601,7 +605,8 @@ fun EditorScreen(
                     KernIconButton(
                         icon = KernIcons.Back,
                         contentDescription = "Back",
-                        onClick = onBack
+                        // Leaving with unsaved edits used to drop them without a word. Ask.
+                        onClick = { if (state.isDirty) confirmDiscard = true else onBack() }
                     )
                 },
                 actions = {
@@ -675,6 +680,19 @@ fun EditorScreen(
                 onCreateFolder = onNewFolder
             )
         }
+    }
+
+    if (confirmDiscard) {
+        KernConfirmDialog(
+            title = "Discard changes?",
+            message = "This file has edits that have not been saved. Leaving now loses them.",
+            confirmLabel = "Discard",
+            onConfirm = {
+                confirmDiscard = false
+                onBack()
+            },
+            onDismiss = { confirmDiscard = false }
+        )
     }
 }
 
