@@ -129,6 +129,8 @@ import com.aliedu.kern.core.model.Todo
 import com.aliedu.kern.core.model.TodoStatus
 import com.aliedu.kern.core.model.ToolEvent
 import com.aliedu.kern.core.model.ToolEventStatus
+import com.aliedu.kern.core.tools.background.BackgroundJob
+import com.aliedu.kern.core.tools.background.BackgroundJobState
 import com.aliedu.kern.core.tools.PatchOperation
 import com.aliedu.kern.core.tools.PatchProposal
 import com.aliedu.kern.core.tools.PlanProposal
@@ -305,6 +307,12 @@ fun AgentScreen(
                                 )
                                 is TimelineItem.Tool -> ToolRow(
                                     event = item.event,
+                                    // A background job keeps reporting after the tool call that
+                                    // started it returned, so the row reads the registry rather
+                                    // than the one-off result string.
+                                    job = item.event.jobId?.let { id ->
+                                        state.jobs.firstOrNull { it.id == id }
+                                    },
                                     // A running shell command shows its live output inside its own
                                     // row, so the transcript never grows a floating panel.
                                     liveOutput = if (
@@ -1851,8 +1859,137 @@ private fun ReasoningRow(text: String, streaming: Boolean) {
  * [liveOutput] is the still-running output of a shell command. It renders inside this row (expanded
  * by default, collapsible) so a command never floats above the composer.
  */
+// ---------------------------------------------------------------------------------------------
+// Background jobs
+// ---------------------------------------------------------------------------------------------
+
+/** Live elapsed time for a job: ticks once a second while it runs, then freezes. */
 @Composable
-private fun ToolRow(event: ToolEvent, liveOutput: String? = null) {
+private fun rememberElapsedMs(job: BackgroundJob): Long {
+    var now by remember(job.id) { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(job.id, job.state) {
+        while (job.running) {
+            now = System.currentTimeMillis()
+            delay(1_000)
+        }
+        now = System.currentTimeMillis()
+    }
+    return ((job.finishedAt ?: now) - job.startedAt).coerceAtLeast(0)
+}
+
+/** Compact duration: 42s, 3m 07s, 1h 04m. */
+private fun durationLabel(ms: Long): String {
+    val total = ms / 1_000
+    val hours = total / 3_600
+    val minutes = (total % 3_600) / 60
+    val seconds = total % 60
+    return when {
+        hours > 0 -> hours.toString() + "h " + minutes.toString().padStart(2, '0') + "m"
+        minutes > 0 -> minutes.toString() + "m " + seconds.toString().padStart(2, '0') + "s"
+        else -> seconds.toString() + "s"
+    }
+}
+
+/**
+ * The job state, inline in the row header. A background job is not a finished tool call, so the
+ * row reports the job — running, done, failed, stopped, and for how long — not the call that
+ * started it.
+ */
+@Composable
+private fun JobStateChip(job: BackgroundJob) {
+    val semantic = LocalKernSemanticColors.current
+    val elapsed = rememberElapsedMs(job)
+    val text = when (job.state) {
+        BackgroundJobState.RUNNING -> "job " + durationLabel(elapsed)
+        BackgroundJobState.SUCCEEDED -> "job done"
+        BackgroundJobState.FAILED -> "job failed"
+        BackgroundJobState.STOPPED -> "job stopped"
+    }
+    val color = when (job.state) {
+        BackgroundJobState.RUNNING -> MaterialTheme.colorScheme.primary
+        BackgroundJobState.SUCCEEDED -> semantic.success
+        BackgroundJobState.FAILED -> MaterialTheme.colorScheme.error
+        BackgroundJobState.STOPPED -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = color,
+        maxLines = 1
+    )
+}
+
+/** The job itself: command, state facts and the output produced so far. */
+@Composable
+private fun JobDetails(job: BackgroundJob) {
+    val semantic = LocalKernSemanticColors.current
+    val scroll = rememberScrollState()
+    val elapsed = rememberElapsedMs(job)
+    val output = job.output
+    LaunchedEffect(output.length, job.state) {
+        if (output.isNotEmpty()) scroll.scrollTo(scroll.maxValue)
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(end = KernSpacing.sm),
+        verticalArrangement = Arrangement.spacedBy(KernSpacing.xxs)
+    ) {
+        Text(
+            text = job.command,
+            style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis
+        )
+        val facts = buildString {
+            append(
+                when (job.state) {
+                    BackgroundJobState.RUNNING -> "Running"
+                    BackgroundJobState.SUCCEEDED -> "Finished"
+                    BackgroundJobState.FAILED -> "Failed"
+                    BackgroundJobState.STOPPED -> "Stopped"
+                }
+            )
+            append(" · ")
+            append(durationLabel(elapsed))
+            job.exitCode?.let { append(" · exit ").append(it) }
+            if (job.outputChars > 0) append(" · ").append(job.outputChars).append(" chars")
+            if (job.truncated) append(" · truncated")
+        }
+        Text(
+            text = facts,
+            style = MaterialTheme.typography.labelSmall,
+            color = when (job.state) {
+                BackgroundJobState.RUNNING -> MaterialTheme.colorScheme.primary
+                BackgroundJobState.SUCCEEDED -> semantic.success
+                BackgroundJobState.FAILED -> MaterialTheme.colorScheme.error
+                BackgroundJobState.STOPPED -> MaterialTheme.colorScheme.onSurfaceVariant
+            }
+        )
+        if (output.isNotBlank()) {
+            Text(
+                text = output.trimEnd(),
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontFamily = FontFamily.Monospace,
+                    lineHeight = 15.sp
+                ),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 220.dp)
+                    .verticalScroll(scroll)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ToolRow(
+    event: ToolEvent,
+    liveOutput: String? = null,
+    job: BackgroundJob? = null
+) {
     val semantic = LocalKernSemanticColors.current
     val isLive = liveOutput != null
     // null = follow the default (open while a command streams, and for a diff short enough to
@@ -1860,12 +1997,25 @@ private fun ToolRow(event: ToolEvent, liveOutput: String? = null) {
     var manual by remember(event.id) { mutableStateOf<Boolean?>(null) }
     val diffRows = remember(event.diff) { event.diff?.let { parseUnifiedDiff(it).size } ?: 0 }
     val autoExpandDiff = diffRows in 1..DIFF_AUTO_EXPAND_ROWS
-    val expanded = manual ?: (isLive || autoExpandDiff)
+    // A running job opens itself: it is the thing the user is waiting on, and its output is the
+    // only progress there is.
+    val expanded = manual ?: (isLive || autoExpandDiff || job?.running == true)
     val hasDetails = event.argsRedacted.isNotBlank() ||
         !event.resultSummary.isNullOrBlank() ||
         (liveOutput?.isNotBlank() == true) ||
-        !event.diff.isNullOrBlank()
-    val accent = when (event.status) {
+        !event.diff.isNullOrBlank() ||
+        event.jobId != null
+    // A background job outlives the call that started it, so the row's icon and colour follow the
+    // job, not the (already completed) call — a green tick next to "job 18s" says the opposite of
+    // what is happening.
+    val rowStatus = when (job?.state) {
+        null -> event.status
+        BackgroundJobState.RUNNING -> ToolEventStatus.RUNNING
+        BackgroundJobState.SUCCEEDED -> ToolEventStatus.COMPLETED
+        BackgroundJobState.FAILED -> ToolEventStatus.FAILED
+        BackgroundJobState.STOPPED -> ToolEventStatus.CANCELLED
+    }
+    val accent = when (rowStatus) {
         ToolEventStatus.RUNNING -> MaterialTheme.colorScheme.primary
         ToolEventStatus.COMPLETED -> semantic.success
         ToolEventStatus.FAILED -> MaterialTheme.colorScheme.error
@@ -1924,6 +2074,17 @@ private fun ToolRow(event: ToolEvent, liveOutput: String? = null) {
                     }
                 }
             }
+            // A background job outlives the tool call that started it, so the row reports the
+            // job's own state and elapsed time instead of the (already finished) call.
+            if (job != null) {
+                JobStateChip(job)
+            } else if (event.jobId != null) {
+                Text(
+                    text = "job gone",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             // The label describes what the agent asked for, not how it ended, so a stopped
             // command still reads "Running …". A trailing word says plainly that it did not
             // finish, and unlike a suffix on the label it survives ellipsis.
@@ -1934,7 +2095,7 @@ private fun ToolRow(event: ToolEvent, liveOutput: String? = null) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            when (event.status) {
+            when (rowStatus) {
                 ToolEventStatus.RUNNING -> CircularProgressIndicator(
                     modifier = Modifier.size(KernSizes.iconXs),
                     strokeWidth = 1.5.dp,
@@ -1989,6 +2150,16 @@ private fun ToolRow(event: ToolEvent, liveOutput: String? = null) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                if (job != null) {
+                    JobDetails(job)
+                } else if (event.jobId != null) {
+                    Text(
+                        text = "This job was started in an earlier session of the app, so its " +
+                            "process and output are gone.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 if (liveOutput != null) {
                     if (liveOutput.isNotBlank()) {
                         Text(
@@ -2004,7 +2175,7 @@ private fun ToolRow(event: ToolEvent, liveOutput: String? = null) {
                                 .verticalScroll(scroll)
                         )
                     }
-                } else {
+                } else if (job == null && event.jobId == null) {
                     val result = event.resultSummary
                     if (!result.isNullOrBlank()) {
                         Text(

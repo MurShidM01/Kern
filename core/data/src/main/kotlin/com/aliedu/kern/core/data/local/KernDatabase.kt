@@ -35,7 +35,7 @@ import com.aliedu.kern.core.data.local.entity.WorkspaceEntity
         LocalPreferenceEntity::class,
         TodoEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 abstract class KernDatabase : RoomDatabase() {
@@ -95,6 +95,16 @@ abstract class KernDatabase : RoomDatabase() {
         val MIGRATION_4_5 = object : Migration(4, 5) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE `tool_events` ADD COLUMN `diff` TEXT")
+            }
+        }
+
+        /**
+         * Adds the background job a tool row started. Existing rows keep their history and simply
+         * have no job to track.
+         */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `tool_events` ADD COLUMN `jobId` TEXT")
             }
         }
     }

@@ -113,7 +113,8 @@ interface ToolEventRepository {
         durationMs: Long?,
         linesAdded: Int = 0,
         linesRemoved: Int = 0,
-        diff: String? = null
+        diff: String? = null,
+        jobId: String? = null
     )
 }
 
@@ -139,8 +140,9 @@ class DefaultToolEventRepository @Inject constructor(
         durationMs: Long?,
         linesAdded: Int,
         linesRemoved: Int,
-        diff: String?
-    ) = dao.updateResult(id, status.name, summary, durationMs, linesAdded, linesRemoved, diff)
+        diff: String?,
+        jobId: String?
+    ) = dao.updateResult(id, status.name, summary, durationMs, linesAdded, linesRemoved, diff, jobId)
 }
 
 interface TodoRepository {

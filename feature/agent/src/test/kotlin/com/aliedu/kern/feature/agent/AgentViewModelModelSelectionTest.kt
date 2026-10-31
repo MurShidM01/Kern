@@ -90,7 +90,8 @@ class AgentViewModelModelSelectionTest {
         val workspaceManager = mockk<WorkspaceManager>(relaxed = true)
         val vm = AgentViewModel(
             orchestrator, workspaceRepo, sessionRepo, messageRepo, toolEventRepo, todoRepo,
-            providerRepo, credentialStore, settings, adapter, workspaceManager, FakeDevServers(), AgentTurnNotifier.None, AgentSessionStore().apply { scope = CoroutineScope(dispatcher) }
+            providerRepo, credentialStore, settings, adapter, workspaceManager, FakeDevServers(),
+            FakeBackgroundJobs(), AgentTurnNotifier.None, AgentSessionStore().apply { scope = CoroutineScope(dispatcher) }
         )
         return Fixture(vm, providerRepo, adapter)
     }

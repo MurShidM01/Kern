@@ -91,7 +91,8 @@ class AgentViewModelTodosTest {
 
         val vm = AgentViewModel(
             orchestrator, workspaceRepo, sessionRepo, messageRepo, toolEventRepo, todoRepo,
-            providerRepo, credentialStore, settings, providerAdapter, workspaceManager, FakeDevServers(), AgentTurnNotifier.None, AgentSessionStore().apply { scope = CoroutineScope(dispatcher) }
+            providerRepo, credentialStore, settings, providerAdapter, workspaceManager, FakeDevServers(),
+            FakeBackgroundJobs(), AgentTurnNotifier.None, AgentSessionStore().apply { scope = CoroutineScope(dispatcher) }
         )
         advanceUntilIdle()
 

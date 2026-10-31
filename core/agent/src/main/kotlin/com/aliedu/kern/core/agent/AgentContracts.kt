@@ -60,7 +60,13 @@ sealed interface AgentEvent {
          * Unified diff of what the tool actually applied, so the transcript row can show the same
          * green/red preview the approval sheet showed. Null when nothing was written.
          */
-        val diff: String? = null
+        val diff: String? = null,
+        /**
+         * The background job this call started, when it handed work off instead of waiting. The
+         * transcript tracks that job — state, elapsed time, output — from the registry, so the row
+         * stays truthful after the tool call itself has finished.
+         */
+        val jobId: String? = null
     ) : AgentEvent
 
     data class TodosUpdated(val todos: List<Todo>) : AgentEvent

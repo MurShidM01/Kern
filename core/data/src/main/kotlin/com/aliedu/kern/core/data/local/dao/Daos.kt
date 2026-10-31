@@ -174,7 +174,8 @@ interface ToolEventDao {
 
     @Query(
         "UPDATE tool_events SET status = :status, resultSummary = :summary, durationMs = :durationMs, " +
-            "linesAdded = :linesAdded, linesRemoved = :linesRemoved, diff = :diff WHERE id = :id"
+            "linesAdded = :linesAdded, linesRemoved = :linesRemoved, diff = :diff, " +
+            "jobId = COALESCE(:jobId, jobId) WHERE id = :id"
     )
     suspend fun updateResult(
         id: String,
@@ -183,7 +184,8 @@ interface ToolEventDao {
         durationMs: Long?,
         linesAdded: Int = 0,
         linesRemoved: Int = 0,
-        diff: String? = null
+        diff: String? = null,
+        jobId: String? = null
     )
 }
 

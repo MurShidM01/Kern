@@ -26,6 +26,7 @@ import com.aliedu.kern.core.tools.ToolArgs
 import com.aliedu.kern.core.tools.ToolContext
 import com.aliedu.kern.core.tools.ToolRegistry
 import com.aliedu.kern.core.tools.ToolResult
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -523,21 +524,35 @@ class AgentOrchestrator @Inject constructor(
                         // progress live instead of a frozen spinner (PRD §4.3 bullet 8). The
                         // callback runs on the executor's own thread, so chunks are funnelled
                         // through a channel and emitted from this coroutine, never concurrently.
-                        val commandResult = coroutineScope {
-                            val chunks = Channel<String>(Channel.UNLIMITED)
-                            val job = async {
-                                try {
-                                    commandExecutor.run(commandRequest) { chunk ->
-                                        chunks.trySend(chunk)
+                        // A run that throws must still close its tool row. The executor reports
+                        // its own failures as results, but anything that escapes it — a write to a
+                        // pty that has just been closed, say — used to unwind the whole turn and
+                        // leave the row spinning with no result to settle it.
+                        val commandResult = try {
+                            coroutineScope {
+                                val chunks = Channel<String>(Channel.UNLIMITED)
+                                val job = async {
+                                    try {
+                                        commandExecutor.run(commandRequest) { chunk ->
+                                            chunks.trySend(chunk)
+                                        }
+                                    } finally {
+                                        chunks.close()
                                     }
-                                } finally {
-                                    chunks.close()
                                 }
+                                for (chunk in chunks) {
+                                    emit(AgentEvent.CommandOutput(commandRequest.command, chunk))
+                                }
+                                job.await()
                             }
-                            for (chunk in chunks) {
-                                emit(AgentEvent.CommandOutput(commandRequest.command, chunk))
-                            }
-                            job.await()
+                        } catch (cancel: CancellationException) {
+                            throw cancel
+                        } catch (error: Exception) {
+                            CommandResult(
+                                exitCode = -1,
+                                output = "The command could not be run: " +
+                                    (error.message ?: error.javaClass.simpleName)
+                            )
                         }
                         emit(AgentEvent.CommandCompleted(commandRequest.command, commandResult))
                         resultText = formatCommandResult(commandRequest, commandResult)
@@ -546,7 +561,8 @@ class AgentOrchestrator @Inject constructor(
                                 call.name,
                                 commandResult.succeeded,
                                 resultText.take(400),
-                                call.id
+                                call.id,
+                                jobId = commandResult.jobId
                             )
                         )
                     } else {

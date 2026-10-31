@@ -54,7 +54,8 @@ object DatabaseModule {
                 KernDatabase.MIGRATION_1_2,
                 KernDatabase.MIGRATION_2_3,
                 KernDatabase.MIGRATION_3_4,
-                KernDatabase.MIGRATION_4_5
+                KernDatabase.MIGRATION_4_5,
+                KernDatabase.MIGRATION_5_6
             )
             .build()
 

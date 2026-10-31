@@ -141,7 +141,10 @@ data class ToolEventEntity(
     val linesAdded: Int = 0,
     val linesRemoved: Int = 0,
     /** Unified diff of the change this row applied, for the transcript preview. */
-    val diff: String? = null
+    val diff: String? = null,
+
+    /** Background job this row started, so the transcript can track it live. */
+    val jobId: String? = null
 )
 
 /** Agent task-list item (FR-018), persisted per session and replaced wholesale on each update. */

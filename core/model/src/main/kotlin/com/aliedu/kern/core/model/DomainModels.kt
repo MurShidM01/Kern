@@ -127,6 +127,13 @@ data class ToolEvent(
     /** Lines a file-writing tool removed. */
     val linesRemoved: Int = 0,
     /**
+     * The background job this row started, when the tool handed work off instead of waiting for
+     * it. The transcript uses it to render a live job card — state, elapsed time and output —
+     * rather than a one-off result string that was true only at the moment it was written.
+     */
+    val jobId: String? = null,
+
+    /**
      * The unified diff a file-writing tool applied, kept so the transcript can show the same
      * green/red preview the approval sheet showed — the row is the record of the change, and a raw
      * tool-call JSON is not a reviewable one. Null for every tool that does not edit files.

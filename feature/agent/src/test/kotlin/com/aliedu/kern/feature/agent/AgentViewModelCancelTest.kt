@@ -194,6 +194,7 @@ class AgentViewModelCancelTest {
             providerAdapter,
             workspaceManager,
             FakeDevServers(),
+            FakeBackgroundJobs(),
             AgentTurnNotifier.None,
             store
         )

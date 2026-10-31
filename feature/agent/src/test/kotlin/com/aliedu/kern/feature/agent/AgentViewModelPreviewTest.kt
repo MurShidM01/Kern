@@ -116,6 +116,7 @@ class AgentViewModelPreviewTest {
             mockk<AiProviderAdapter>(relaxed = true),
             workspaceManager,
             devServers,
+            FakeBackgroundJobs(),
             AgentTurnNotifier.None, AgentSessionStore().apply { scope = CoroutineScope(dispatcher) }
         )
     }

@@ -32,6 +32,8 @@ import com.aliedu.kern.core.tools.CommandImpact
 import com.aliedu.kern.core.tools.CommandRequest
 import com.aliedu.kern.core.tools.PatchProposal
 import com.aliedu.kern.core.tools.PlanProposal
+import com.aliedu.kern.core.tools.background.BackgroundJob
+import com.aliedu.kern.core.tools.background.BackgroundJobRegistry
 import com.aliedu.kern.core.tools.devserver.DevServer
 import com.aliedu.kern.core.tools.devserver.DevServerRegistry
 import com.aliedu.kern.core.tools.devserver.DevServerState
@@ -111,7 +113,13 @@ data class AgentUiState(
      * Servers the agent started that are accepting connections. Non-empty is what puts the preview
      * icon in the app bar (PRD §4.3 bullet 8).
      */
-    val runningServers: List<DevServer> = emptyList()
+    val runningServers: List<DevServer> = emptyList(),
+    /**
+     * Background jobs started in this process. The transcript's job cards read this, so a job the
+     * agent started keeps reporting its state, elapsed time and output after the tool call that
+     * started it has long finished.
+     */
+    val jobs: List<BackgroundJob> = emptyList()
 ) {
     val isBusy: Boolean get() = agentState == AgentState.REQUESTING_MODEL ||
         agentState == AgentState.ASSISTANT_RESPONSE ||
@@ -134,6 +142,7 @@ class AgentViewModel @Inject constructor(
     private val providerAdapter: AiProviderAdapter,
     private val workspaceManager: WorkspaceManager,
     private val devServers: DevServerRegistry,
+    private val backgroundJobs: BackgroundJobRegistry,
     private val turnNotifier: AgentTurnNotifier,
     private val sessionStore: AgentSessionStore
 ) : ViewModel() {
@@ -216,6 +225,11 @@ class AgentViewModel @Inject constructor(
                 _state.value = _state.value.copy(
                     runningServers = servers.filter { it.state == DevServerState.RUNNING && it.url != null }
                 )
+            }
+        }
+        viewModelScope.launch {
+            backgroundJobs.jobs.collect { jobs ->
+                _state.value = _state.value.copy(jobs = jobs)
             }
         }
     }
@@ -487,7 +501,8 @@ class AgentViewModel @Inject constructor(
                         durationMs = started?.let { System.currentTimeMillis() - it },
                         linesAdded = event.linesAdded,
                         linesRemoved = event.linesRemoved,
-                        diff = event.diff
+                        diff = event.diff,
+                        jobId = event.jobId
                     )
                 }
             }

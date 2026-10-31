@@ -175,7 +175,8 @@ fun ToolEventEntity.toDomain(): ToolEvent = ToolEvent(
     createdAt = createdAt,
     linesAdded = linesAdded,
     linesRemoved = linesRemoved,
-    diff = diff
+    diff = diff,
+    jobId = jobId
 )
 
 fun ToolEvent.toEntity(): ToolEventEntity = ToolEventEntity(
@@ -190,7 +191,8 @@ fun ToolEvent.toEntity(): ToolEventEntity = ToolEventEntity(
     createdAt = createdAt,
     linesAdded = linesAdded,
     linesRemoved = linesRemoved,
-    diff = diff
+    diff = diff,
+    jobId = jobId
 )
 
 fun TodoEntity.toDomain(): Todo = Todo(
