@@ -65,6 +65,7 @@ import com.aliedu.kern.core.designsystem.theme.KernSizes
 import com.aliedu.kern.core.designsystem.theme.KernSpacing
 import com.aliedu.kern.core.model.Session
 import com.aliedu.kern.core.model.Workspace
+import com.aliedu.kern.core.model.WorkspaceSourceType
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -355,10 +356,19 @@ fun HomeScreen(
     }
 
     pendingDelete?.let { workspace ->
+        // An app-managed project lives inside the app's own storage, so removing it deletes the
+        // files too — promising otherwise and then calling deleteRecursively() destroyed work the
+        // dialog had just said was safe. A folder the user picked is only unlinked from Kern.
+        val message = if (workspace.sourceType == WorkspaceSourceType.APP_MANAGED) {
+            "\"${workspace.displayName}\" is stored inside Kern, so its files are deleted with it. " +
+                "This cannot be undone."
+        } else {
+            "\"${workspace.displayName}\" will be removed from Kern. The folder on your device is " +
+                "left exactly as it is — you can add it again later."
+        }
         KernConfirmDialog(
             title = "Remove workspace?",
-            message = "\"${workspace.displayName}\" will be removed from Kern. Your files on disk are " +
-                "never deleted — you can add the folder again later.",
+            message = message,
             confirmLabel = "Remove",
             onConfirm = {
                 onDeleteWorkspace(workspace)
