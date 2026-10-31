@@ -15,9 +15,9 @@ android {
         applicationId = "com.aliedu.kern.agent"
         minSdk = 28
         targetSdk = 37
-        // versionCode is the release date (YY MM DD): 30 Oct 2026 -> 261030.
-        versionCode = 261030
-        versionName = "1.0.4"
+        // versionCode is the release date (YYYY MM DD): 1 Nov 2026 -> 20261101.
+        versionCode = 20261101
+        versionName = "1.0.6"
         testInstrumentationRunner = "com.aliedu.kern.agent.HiltTestRunner"
         vectorDrawables {
             useSupportLibrary = true
